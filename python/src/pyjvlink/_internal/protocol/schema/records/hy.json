@@ -1,0 +1,38 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "HY",
+  "title": "馬名の意味由来",
+  "record_length": 123,
+  "key_fields": ["pedigree_reg_num"],
+  "common_header_fields_ref": "../_common_header_fields.json",
+  "fields": [
+    {
+      "name": "pedigree_reg_num",
+      "item_number": 4,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 12,
+      "byte_size": 10,
+      "is_key": true,
+      "display": {"label": "血統登録番号", "width_type": "half", "char_count": 10}
+    },
+    {
+      "name": "horse_name",
+      "item_number": 5,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 22,
+      "byte_size": 36,
+      "display": {"label": "馬名", "width_type": "full", "char_count": 18}
+    },
+    {
+      "name": "horse_name_meaning",
+      "item_number": 6,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 58,
+      "byte_size": 64,
+      "display": {"label": "馬名の意味由来", "width_type": "full", "char_count": 32}
+    }
+  ]
+}

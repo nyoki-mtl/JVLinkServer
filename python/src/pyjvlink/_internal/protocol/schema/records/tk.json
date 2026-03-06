@@ -1,0 +1,347 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "TK",
+  "title": "特別登録馬",
+  "record_length": 21657,
+  "key_fields": ["meet_year", "meet_date", "racecourse_code", "meet_round", "meet_day", "race_number"],
+  "common_fields_ref": "../_common_race_fields.json",
+  "fields": [
+    {
+      "name": "weekday_code",
+      "item_number": 10,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 28,
+      "byte_size": 1,
+      "display": {"label": "曜日コード", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "special_race_number",
+      "item_number": 11,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 29,
+      "byte_size": 4,
+      "display": {"label": "特別競走番号", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "race_name_main",
+      "item_number": 12,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 33,
+      "byte_size": 60,
+      "display": {"label": "競走名本題", "width_type": "full", "char_count": 30}
+    },
+    {
+      "name": "race_name_subtitle",
+      "item_number": 13,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 93,
+      "byte_size": 60,
+      "display": {"label": "競走名副題", "width_type": "full", "char_count": 30}
+    },
+    {
+      "name": "race_name_parentheses",
+      "item_number": 14,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 153,
+      "byte_size": 60,
+      "display": {"label": "競走名カッコ内", "width_type": "full", "char_count": 30}
+    },
+    {
+      "name": "race_name_main_english",
+      "item_number": 15,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 213,
+      "byte_size": 120,
+      "display": {"label": "競走名本題欧字", "width_type": "half", "char_count": 120}
+    },
+    {
+      "name": "race_name_subtitle_english",
+      "item_number": 16,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 333,
+      "byte_size": 120,
+      "display": {"label": "競走名副題欧字", "width_type": "half", "char_count": 120}
+    },
+    {
+      "name": "race_name_parentheses_english",
+      "item_number": 17,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 453,
+      "byte_size": 120,
+      "display": {"label": "競走名カッコ内欧字", "width_type": "half", "char_count": 120}
+    },
+    {
+      "name": "race_short_name_10",
+      "item_number": 18,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 573,
+      "byte_size": 20,
+      "display": {"label": "競走名略称10文字", "width_type": "full", "char_count": 10}
+    },
+    {
+      "name": "race_short_name_6",
+      "item_number": 19,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 593,
+      "byte_size": 12,
+      "display": {"label": "競走名略称6文字", "width_type": "full", "char_count": 6}
+    },
+    {
+      "name": "race_short_name_3",
+      "item_number": 20,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 605,
+      "byte_size": 6,
+      "display": {"label": "競走名略称3文字", "width_type": "full", "char_count": 3}
+    },
+    {
+      "name": "race_name_code",
+      "item_number": 21,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 611,
+      "byte_size": 1,
+      "display": {"label": "競走名区分", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "graded_race_round_number",
+      "item_number": 22,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 612,
+      "byte_size": 3,
+      "display": {"label": "重賞回次", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "grade_code",
+      "item_number": 23,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 615,
+      "byte_size": 1,
+      "display": {"label": "グレードコード", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "race_type_code",
+      "item_number": 24,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 616,
+      "byte_size": 2,
+      "display": {"label": "競走種別コード", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "race_symbol_code",
+      "item_number": 25,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 618,
+      "byte_size": 3,
+      "display": {"label": "競走記号コード", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "weight_type_code",
+      "item_number": 26,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 621,
+      "byte_size": 1,
+      "display": {"label": "重量種別コード", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "race_cond_code_2yo",
+      "item_number": 27,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 622,
+      "byte_size": 3,
+      "display": {"label": "競走条件コード 2歳条件", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "race_cond_code_3yo",
+      "item_number": 28,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 625,
+      "byte_size": 3,
+      "display": {"label": "競走条件コード 3歳条件", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "race_cond_code_4yo",
+      "item_number": 29,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 628,
+      "byte_size": 3,
+      "display": {"label": "競走条件コード 4歳条件", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "race_cond_code_5yo_up",
+      "item_number": 30,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 631,
+      "byte_size": 3,
+      "display": {"label": "競走条件コード 5歳以上条件", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "race_cond_code_youngest",
+      "item_number": 31,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 634,
+      "byte_size": 3,
+      "display": {"label": "競走条件コード 最若年条件", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "distance",
+      "item_number": 32,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 637,
+      "byte_size": 4,
+      "unit": "meters",
+      "display": {"label": "距離", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "track_code",
+      "item_number": 33,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 641,
+      "byte_size": 2,
+      "display": {"label": "トラックコード", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "course_code",
+      "item_number": 34,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 643,
+      "byte_size": 2,
+      "display": {"label": "コース区分", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "handicap_announcement_date",
+      "item_number": 35,
+      "wire_type": "string",
+      "semantic_type": "date_yyyymmdd",
+      "byte_position": 645,
+      "byte_size": 8,
+      "display": {"label": "ハンデ発表日", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "num_entries",
+      "item_number": 36,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 653,
+      "byte_size": 3,
+      "display": {"label": "登録頭数", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "entry_horses",
+      "item_number": 37,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 656,
+      "byte_size": 21000,
+      "display": {"label": "登録馬毎情報"},
+      "array_info": {"element_size": 70, "count": 300},
+      "element_fields": [
+        {
+          "name": "serial_number",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 0,
+          "byte_size": 3,
+          "display": {"label": "連番", "width_type": "half", "char_count": 3}
+        },
+        {
+          "name": "pedigree_reg_num",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 3,
+          "byte_size": 10,
+          "display": {"label": "血統登録番号", "width_type": "half", "char_count": 10}
+        },
+        {
+          "name": "horse_name",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 13,
+          "byte_size": 36,
+          "display": {"label": "馬名", "width_type": "full", "char_count": 18}
+        },
+        {
+          "name": "horse_symbol_code",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 49,
+          "byte_size": 2,
+          "display": {"label": "馬記号コード", "width_type": "half", "char_count": 2}
+        },
+        {
+          "name": "sex_code",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 51,
+          "byte_size": 1,
+          "display": {"label": "性別コード", "width_type": "half", "char_count": 1}
+        },
+        {
+          "name": "trainer_affiliation_code",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 52,
+          "byte_size": 1,
+          "display": {"label": "調教師東西所属コード", "width_type": "half", "char_count": 1}
+        },
+        {
+          "name": "trainer_code",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 53,
+          "byte_size": 5,
+          "display": {"label": "調教師コード", "width_type": "half", "char_count": 5}
+        },
+        {
+          "name": "trainer_short_name",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 58,
+          "byte_size": 8,
+          "display": {"label": "調教師名略称", "width_type": "full", "char_count": 4}
+        },
+        {
+          "name": "impost_weight",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 66,
+          "byte_size": 3,
+          "unit": "0.1kg",
+          "display": {"label": "負担重量", "width_type": "half", "char_count": 3}
+        },
+        {
+          "name": "exchange_code",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 69,
+          "byte_size": 1,
+          "display": {"label": "交流区分", "width_type": "half", "char_count": 1}
+        }
+      ]
+    }
+  ]
+}

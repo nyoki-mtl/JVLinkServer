@@ -1,0 +1,109 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "BN",
+  "title": "馬主マスタ",
+  "record_length": 477,
+  "key_fields": ["owner_code"],
+  "common_header_fields_ref": "../_common_header_fields.json",
+  "fields": [
+    {
+      "name": "owner_code",
+      "item_number": 4,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 12,
+      "byte_size": 6,
+      "display": {"label": "馬主コード", "width_type": "half", "char_count": 6}
+    },
+    {
+      "name": "owner_name_with_corp",
+      "item_number": 5,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 18,
+      "byte_size": 64,
+      "display": {"label": "馬主名(法人格有)", "width_type": "mixed", "char_count": 32}
+    },
+    {
+      "name": "owner_name",
+      "item_number": 6,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 82,
+      "byte_size": 64,
+      "display": {"label": "馬主名(法人格無)", "width_type": "mixed", "char_count": 32}
+    },
+    {
+      "name": "owner_name_kana",
+      "item_number": 7,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 146,
+      "byte_size": 50,
+      "display": {"label": "馬主名半角カナ", "width_type": "half", "char_count": 50}
+    },
+    {
+      "name": "owner_name_english",
+      "item_number": 8,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 196,
+      "byte_size": 100,
+      "display": {"label": "馬主名欧字", "width_type": "mixed", "char_count": 50}
+    },
+    {
+      "name": "silk_colors_code",
+      "item_number": 9,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 296,
+      "byte_size": 60,
+      "display": {"label": "服色標示", "width_type": "full", "char_count": 30}
+    },
+    {
+      "name": "performance_stats",
+      "item_number": 10,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 356,
+      "byte_size": 120,
+      "display": {"label": "本年累計成績情報"},
+      "array_info": {"element_size": 60, "count": 2},
+      "element_fields": [
+        {
+          "name": "year",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 0,
+          "byte_size": 4,
+          "display": {"label": "設定年", "width_type": "half", "char_count": 4}
+        },
+        {
+          "name": "prize_money",
+          "wire_type": "string",
+          "semantic_type": "money_100yen",
+          "byte_offset": 4,
+          "byte_size": 10,
+          "display": {"label": "本賞金合計", "width_type": "half", "char_count": 10}
+        },
+        {
+          "name": "added_money",
+          "wire_type": "string",
+          "semantic_type": "money_100yen",
+          "byte_offset": 14,
+          "byte_size": 10,
+          "display": {"label": "付加賞金合計", "width_type": "half", "char_count": 10}
+        },
+        {
+          "name": "placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 24,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6},
+          "display": {"label": "着回数", "width_type": "half", "char_count": 36}
+        }
+      ]
+    }
+  ]
+}

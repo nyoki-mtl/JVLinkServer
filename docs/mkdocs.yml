@@ -1,0 +1,185 @@
+site_name: JVLinkServer
+site_description: JV-Link HTTP サーバー & Python クライアント ドキュメント
+site_url: https://nyoki-mtl.github.io/JVLinkServer/
+repo_url: https://github.com/nyoki-mtl/JVLinkServer
+repo_name: nyoki-mtl/JVLinkServer
+
+docs_dir: src
+
+theme:
+  name: material
+  language: ja
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: ダークモードに切り替え
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: ライトモードに切り替え
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search:
+      lang: ja
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - tables
+  - toc:
+      permalink: true
+  - attr_list
+  - def_list
+
+nav:
+  - ホーム: index.md
+  - はじめに:
+      - インストール: getting-started/installation.md
+      - クイックスタート: getting-started/quickstart.md
+      - JV-Link 前提条件: getting-started/prerequisites.md
+  - ガイド:
+      - データ取得の基本: guides/dataspec-usage.md
+      - 使用例・サンプルコード: guides/examples.md
+      - イベント監視: guides/event-monitoring.md
+      - CLI: guides/cli.md
+      - トラブルシューティング: guides/troubleshooting.md
+  - DataSpec:
+      - 概要: data-specs/index.md
+      - 蓄積系:
+          - RACE: data-specs/storage/race.md
+          - DIFF: data-specs/storage/diff.md
+          - SNAP: data-specs/storage/snap.md
+          - HOSE: data-specs/storage/hose.md
+          - BLOD: data-specs/storage/blod.md
+          - TOKU: data-specs/storage/toku.md
+          - SLOP: data-specs/storage/slop.md
+          - WOOD: data-specs/storage/wood.md
+          - MING: data-specs/storage/ming.md
+          - YSCH: data-specs/storage/ysch.md
+          - HOYU: data-specs/storage/hoyu.md
+          - COMM: data-specs/storage/comm.md
+          - TCOV: data-specs/storage/tcov.md
+          - RCOV: data-specs/storage/rcov.md
+      - リアルタイム系:
+          - "0B11": data-specs/realtime/0b11.md
+          - "0B12": data-specs/realtime/0b12.md
+          - "0B13": data-specs/realtime/0b13.md
+          - "0B14": data-specs/realtime/0b14.md
+          - "0B15": data-specs/realtime/0b15.md
+          - "0B16": data-specs/realtime/0b16.md
+          - "0B17": data-specs/realtime/0b17.md
+          - "0B20": data-specs/realtime/0b20.md
+          - "0B30": data-specs/realtime/0b30.md
+          - "0B31": data-specs/realtime/0b31.md
+          - "0B32": data-specs/realtime/0b32.md
+          - "0B33": data-specs/realtime/0b33.md
+          - "0B34": data-specs/realtime/0b34.md
+          - "0B35": data-specs/realtime/0b35.md
+          - "0B36": data-specs/realtime/0b36.md
+          - "0B41": data-specs/realtime/0b41.md
+          - "0B42": data-specs/realtime/0b42.md
+          - "0B51": data-specs/realtime/0b51.md
+  - レコード:
+      - 概要: records/index.md
+      - レース:
+          - TK (特別登録馬): records/tk.md
+          - RA (レース詳細): records/ra.md
+          - SE (馬毎レース情報): records/se.md
+          - WF (重勝式 WIN5): records/wf.md
+      - 払戻・票数:
+          - HR (払戻): records/hr.md
+          - H1 (票数 単複枠): records/h1.md
+          - H6 (票数 3連単): records/h6.md
+      - オッズ:
+          - O1 (単勝・複勝・枠連): records/o1.md
+          - O2 (馬連): records/o2.md
+          - O3 (ワイド): records/o3.md
+          - O4 (馬単): records/o4.md
+          - O5 (3連複): records/o5.md
+          - O6 (3連単): records/o6.md
+      - マスタ (競走馬・血統):
+          - UM (競走馬マスタ): records/um.md
+          - HN (繁殖馬マスタ): records/hn.md
+          - SK (産駒マスタ): records/sk.md
+          - BT (系統情報): records/bt.md
+          - DM (タイム型予想): records/dm.md
+          - TM (対戦型予想): records/tm.md
+      - マスタ (関係者):
+          - KS (騎手マスタ): records/ks.md
+          - CH (調教師マスタ): records/ch.md
+          - BR (生産者マスタ): records/br.md
+          - BN (馬主マスタ): records/bn.md
+      - 成績・統計:
+          - CK (出走別着度数): records/ck.md
+          - RC (レコードマスタ): records/rc.md
+          - CS (コース情報): records/cs.md
+      - 調教:
+          - HC (坂路調教): records/hc.md
+          - WC (ウッドチップ調教): records/wc.md
+      - 当日速報・変更:
+          - WH (馬体重): records/wh.md
+          - WE (天候馬場状態): records/we.md
+          - AV (出走取消・競走除外): records/av.md
+          - JC (騎手変更): records/jc.md
+          - TC (発走時刻変更): records/tc.md
+          - CC (コース変更): records/cc.md
+          - JG (競走馬除外情報): records/jg.md
+      - その他:
+          - HS (競走馬市場取引価格): records/hs.md
+          - HY (馬名の意味由来): records/hy.md
+          - YS (開催スケジュール): records/ys.md
+      - 開催中止時の運用: records/race-cancellation-operations.md
+  - コード表:
+      - 概要: code-tables/index.md
+      - 競馬場コード: code-tables/racecourse-codes.md
+      - 基本コード: code-tables/basic-codes.md
+      - レースコード: code-tables/race-codes.md
+      - コンディションコード: code-tables/condition-codes.md
+      - 馬コード: code-tables/horse-codes.md
+      - 騎手コード: code-tables/jockey-codes.md
+      - 結果コード: code-tables/result-codes.md
+  - API リファレンス:
+      - 概要: api/index.md
+      - Python:
+          - 概要: api/python/index.md
+          - Client: api/python/client.md
+          - Config: api/python/config.md
+          - Exceptions: api/python/exceptions.md
+          - Responses: api/python/responses.md
+          - Codes: api/python/codes.md
+          - Types: api/python/types.md
+      - C++:
+          - 概要: api/cpp/index.md
+  - 付録:
+      - 配信スケジュール: appendix/delivery-schedule.md
+      - 歴史的変更点: appendix/historical-changes.md
+      - Migration Notes: appendix/migration-notes.md
+      - JV-Link の制限事項: appendix/jvlink-limitations.md
+      - エラーコード一覧: appendix/error-codes.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/nyoki-mtl/JVLinkServer
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/pyjvlink/

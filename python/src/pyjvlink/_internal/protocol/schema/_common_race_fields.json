@@ -1,0 +1,83 @@
+{
+  "$comment": "Common race identification fields (items 2-9) shared by most record types.",
+  "fields": [
+    {
+      "name": "data_code",
+      "item_number": 2,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 3,
+      "byte_size": 1,
+      "display": {"label": "データ区分", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "data_creation_date",
+      "item_number": 3,
+      "wire_type": "string",
+      "semantic_type": "date_yyyymmdd",
+      "byte_position": 4,
+      "byte_size": 8,
+      "display": {"label": "データ作成年月日", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "meet_year",
+      "item_number": 4,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 12,
+      "byte_size": 4,
+      "is_key": true,
+      "display": {"label": "開催年", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "meet_date",
+      "item_number": 5,
+      "wire_type": "string",
+      "semantic_type": "date_mmdd",
+      "byte_position": 16,
+      "byte_size": 4,
+      "is_key": true,
+      "display": {"label": "開催月日", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "racecourse_code",
+      "item_number": 6,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 20,
+      "byte_size": 2,
+      "is_key": true,
+      "display": {"label": "競馬場コード", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "meet_round",
+      "item_number": 7,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 22,
+      "byte_size": 2,
+      "is_key": true,
+      "display": {"label": "開催回", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "meet_day",
+      "item_number": 8,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 24,
+      "byte_size": 2,
+      "is_key": true,
+      "display": {"label": "開催日目", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "race_number",
+      "item_number": 9,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 26,
+      "byte_size": 2,
+      "is_key": true,
+      "display": {"label": "レース番号", "width_type": "half", "char_count": 2}
+    }
+  ]
+}

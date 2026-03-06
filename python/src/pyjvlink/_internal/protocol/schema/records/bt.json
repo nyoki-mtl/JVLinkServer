@@ -1,0 +1,47 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "BT",
+  "title": "系統情報",
+  "record_length": 6889,
+  "key_fields": ["breeding_reg_num"],
+  "common_header_fields_ref": "../_common_header_fields.json",
+  "fields": [
+    {
+      "name": "breeding_reg_num",
+      "item_number": 4,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 12,
+      "byte_size": 10,
+      "is_key": true,
+      "display": {"label": "繁殖登録番号", "width_type": "half", "char_count": 10}
+    },
+    {
+      "name": "lineage_id",
+      "item_number": 5,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 22,
+      "byte_size": 30,
+      "display": {"label": "系統ID", "width_type": "half", "char_count": 30}
+    },
+    {
+      "name": "lineage_name",
+      "item_number": 6,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 52,
+      "byte_size": 36,
+      "display": {"label": "系統名", "width_type": "full", "char_count": 18}
+    },
+    {
+      "name": "lineage_description",
+      "item_number": 7,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 88,
+      "byte_size": 6800,
+      "display": {"label": "系統説明", "width_type": "mixed", "char_count": 6800}
+    }
+  ]
+}

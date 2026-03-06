@@ -1,0 +1,113 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "HS",
+  "title": "競走馬市場取引価格",
+  "record_length": 200,
+  "key_fields": ["pedigree_reg_num", "market_code", "market_start_date"],
+  "common_header_fields_ref": "../_common_header_fields.json",
+  "fields": [
+    {
+      "name": "pedigree_reg_num",
+      "item_number": 4,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 12,
+      "byte_size": 10,
+      "is_key": true,
+      "display": {"label": "血統登録番号", "width_type": "half", "char_count": 10}
+    },
+    {
+      "name": "sire_breeding_reg_num",
+      "item_number": 5,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 22,
+      "byte_size": 10,
+      "display": {"label": "父馬 繁殖登録番号", "width_type": "half", "char_count": 10}
+    },
+    {
+      "name": "dam_breeding_reg_num",
+      "item_number": 6,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 32,
+      "byte_size": 10,
+      "display": {"label": "母馬 繁殖登録番号", "width_type": "half", "char_count": 10}
+    },
+    {
+      "name": "birth_year",
+      "item_number": 7,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 42,
+      "byte_size": 4,
+      "display": {"label": "生年", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "market_code",
+      "item_number": 8,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 46,
+      "byte_size": 6,
+      "is_key": true,
+      "display": {"label": "主催者・市場コード", "width_type": "half", "char_count": 6}
+    },
+    {
+      "name": "organizer_name",
+      "item_number": 9,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 52,
+      "byte_size": 40,
+      "display": {"label": "主催者名称", "width_type": "full", "char_count": 20}
+    },
+    {
+      "name": "market_name",
+      "item_number": 10,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 92,
+      "byte_size": 80,
+      "display": {"label": "市場の名称", "width_type": "full", "char_count": 40}
+    },
+    {
+      "name": "market_start_date",
+      "item_number": 11,
+      "wire_type": "string",
+      "semantic_type": "date_yyyymmdd",
+      "byte_position": 172,
+      "byte_size": 8,
+      "is_key": true,
+      "display": {"label": "市場の開催期間(開始日)", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "market_end_date",
+      "item_number": 12,
+      "wire_type": "string",
+      "semantic_type": "date_yyyymmdd",
+      "byte_position": 180,
+      "byte_size": 8,
+      "display": {"label": "市場の開催期間(終了日)", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "horse_age_at_trade",
+      "item_number": 13,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 188,
+      "byte_size": 1,
+      "display": {"label": "取引時の競走馬の年齢", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "trade_price",
+      "item_number": 14,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 189,
+      "byte_size": 10,
+      "unit": "yen",
+      "display": {"label": "取引価格", "width_type": "half", "char_count": 10}
+    }
+  ]
+}

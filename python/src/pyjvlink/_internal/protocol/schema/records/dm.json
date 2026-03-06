@@ -1,0 +1,63 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "DM",
+  "title": "タイム型データマイニング予想",
+  "record_length": 303,
+  "key_fields": ["meet_year", "meet_date", "racecourse_code", "meet_round", "meet_day", "race_number"],
+  "common_fields_ref": "../_common_race_fields.json",
+  "fields": [
+    {
+      "name": "data_creation_time",
+      "item_number": 10,
+      "wire_type": "string",
+      "semantic_type": "time_hhmm",
+      "byte_position": 28,
+      "byte_size": 4,
+      "display": {"label": "データ作成時分", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "mining_predictions",
+      "item_number": 11,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 32,
+      "byte_size": 270,
+      "display": {"label": "マイニング予想"},
+      "array_info": {"element_size": 15, "count": 18},
+      "element_fields": [
+        {
+          "name": "horse_number",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 0,
+          "byte_size": 2,
+          "display": {"label": "馬番", "width_type": "half", "char_count": 2}
+        },
+        {
+          "name": "predicted_finish_time",
+          "wire_type": "string",
+          "semantic_type": "duration_mss_ss",
+          "byte_offset": 2,
+          "byte_size": 5,
+          "display": {"label": "予想走破タイム", "width_type": "half", "char_count": 5}
+        },
+        {
+          "name": "error_margin_plus",
+          "wire_type": "string",
+          "semantic_type": "duration_ss_ss",
+          "byte_offset": 7,
+          "byte_size": 4,
+          "display": {"label": "予想誤差+", "width_type": "half", "char_count": 4}
+        },
+        {
+          "name": "error_margin_minus",
+          "wire_type": "string",
+          "semantic_type": "duration_ss_ss",
+          "byte_offset": 11,
+          "byte_size": 4,
+          "display": {"label": "予想誤差-", "width_type": "half", "char_count": 4}
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "$comment": "Common header fields (items 2-3) shared by all record types including non-race masters.",
+  "fields": [
+    {
+      "name": "data_code",
+      "item_number": 2,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 3,
+      "byte_size": 1,
+      "display": {"label": "データ区分", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "data_creation_date",
+      "item_number": 3,
+      "wire_type": "string",
+      "semantic_type": "date_yyyymmdd",
+      "byte_position": 4,
+      "byte_size": 8,
+      "display": {"label": "データ作成年月日", "width_type": "half", "char_count": 8}
+    }
+  ]
+}

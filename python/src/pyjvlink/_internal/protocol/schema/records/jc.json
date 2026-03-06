@@ -1,0 +1,113 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "JC",
+  "title": "騎手変更",
+  "record_length": 161,
+  "key_fields": ["meet_year", "meet_date", "racecourse_code", "meet_round", "meet_day", "race_number", "horse_number"],
+  "common_fields_ref": "../_common_race_fields.json",
+  "has_announcement_datetime": true,
+  "fields": [
+    {
+      "name": "announcement_datetime",
+      "item_number": 10,
+      "wire_type": "string",
+      "semantic_type": "datetime_mmddhhmm",
+      "byte_position": 28,
+      "byte_size": 8,
+      "display": {"label": "発表月日時分", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "horse_number",
+      "item_number": 11,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 36,
+      "byte_size": 2,
+      "is_key": true,
+      "display": {"label": "馬番", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "horse_name",
+      "item_number": 12,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 38,
+      "byte_size": 36,
+      "display": {"label": "馬名", "width_type": "full", "char_count": 18}
+    },
+    {
+      "name": "after_weight_carried",
+      "item_number": 13,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 74,
+      "byte_size": 3,
+      "unit": "0.1kg",
+      "display": {"label": "変更後負担重量", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "after_jockey_code",
+      "item_number": 14,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 77,
+      "byte_size": 5,
+      "display": {"label": "変更後騎手コード", "width_type": "half", "char_count": 5}
+    },
+    {
+      "name": "after_jockey_name",
+      "item_number": 15,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 82,
+      "byte_size": 34,
+      "display": {"label": "変更後騎手名", "width_type": "full", "char_count": 17}
+    },
+    {
+      "name": "after_apprentice_code",
+      "item_number": 16,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 116,
+      "byte_size": 1,
+      "display": {"label": "変更後騎手見習コード", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "before_weight_carried",
+      "item_number": 17,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 117,
+      "byte_size": 3,
+      "unit": "0.1kg",
+      "display": {"label": "変更前負担重量", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "before_jockey_code",
+      "item_number": 18,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 120,
+      "byte_size": 5,
+      "display": {"label": "変更前騎手コード", "width_type": "half", "char_count": 5}
+    },
+    {
+      "name": "before_jockey_name",
+      "item_number": 19,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 125,
+      "byte_size": 34,
+      "display": {"label": "変更前騎手名", "width_type": "full", "char_count": 17}
+    },
+    {
+      "name": "before_apprentice_code",
+      "item_number": 20,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 159,
+      "byte_size": 1,
+      "display": {"label": "変更前騎手見習コード", "width_type": "half", "char_count": 1}
+    }
+  ]
+}

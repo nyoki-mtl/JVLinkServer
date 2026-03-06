@@ -1,0 +1,102 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "O3",
+  "title": "ワイドオッズ",
+  "record_length": 2654,
+  "key_fields": ["meet_year", "meet_date", "racecourse_code", "meet_round", "meet_day", "race_number"],
+  "common_fields_ref": "../_common_race_fields.json",
+  "has_announcement_datetime": true,
+  "fields": [
+    {
+      "name": "announcement_datetime",
+      "item_number": 10,
+      "wire_type": "string",
+      "semantic_type": "datetime_mmddhhmm",
+      "byte_position": 28,
+      "byte_size": 8,
+      "display": {"label": "発表月日時分", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "num_entries",
+      "item_number": 11,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 36,
+      "byte_size": 2,
+      "display": {"label": "登録頭数", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "num_starters",
+      "item_number": 12,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 38,
+      "byte_size": 2,
+      "display": {"label": "出走頭数", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "wide_sales_flag",
+      "item_number": 13,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 40,
+      "byte_size": 1,
+      "display": {"label": "発売フラグ ワイド", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "wide_odds",
+      "item_number": 14,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 41,
+      "byte_size": 2601,
+      "display": {"label": "ワイドオッズ"},
+      "array_info": {"element_size": 17, "count": 153},
+      "element_fields": [
+        {
+          "name": "combination",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 4,
+          "display": {"label": "組番", "width_type": "half", "char_count": 4}
+        },
+        {
+          "name": "min_odds",
+          "wire_type": "string",
+          "semantic_type": "float",
+          "byte_offset": 4,
+          "byte_size": 5,
+          "scale": 10,
+          "display": {"label": "最低オッズ", "width_type": "half", "char_count": 5}
+        },
+        {
+          "name": "max_odds",
+          "wire_type": "string",
+          "semantic_type": "float",
+          "byte_offset": 9,
+          "byte_size": 5,
+          "scale": 10,
+          "display": {"label": "最高オッズ", "width_type": "half", "char_count": 5}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 14,
+          "byte_size": 3,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 3}
+        }
+      ]
+    },
+    {
+      "name": "wide_total_votes",
+      "item_number": 15,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 2642,
+      "byte_size": 11,
+      "display": {"label": "ワイド票数合計", "width_type": "half", "char_count": 11}
+    }
+  ]
+}

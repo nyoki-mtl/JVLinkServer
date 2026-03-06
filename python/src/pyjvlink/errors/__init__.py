@@ -1,0 +1,136 @@
+"""PyJVLink exception hierarchy."""
+
+from typing import NoReturn
+
+
+class JVLinkError(Exception):
+    """Base exception for PyJVLink."""
+
+
+class JVServerError(JVLinkError):
+    """JVLinkServer-related error."""
+
+    def __init__(self, message: str, error_code: int | None = None):
+        super().__init__(message)
+        self.error_code = error_code
+
+
+class JVOpenError(JVServerError):
+    """JVOpen error returned by JV-Link."""
+
+
+class JVAuthError(JVServerError):
+    """Authentication or authorization error."""
+
+
+class JVFileCorruptedError(JVServerError):
+    """Downloaded file is corrupted."""
+
+
+class JVConnectionError(JVLinkError):
+    """Connection error between client and server."""
+
+
+class JVDataError(JVLinkError):
+    """Data processing error."""
+
+
+class JVValidationError(JVDataError):
+    """Base class for input validation errors."""
+
+
+class JVTimeoutError(JVLinkError):
+    """Timeout waiting for server response."""
+
+
+class JVInvalidDataSpecError(JVValidationError):
+    """Invalid dataspec."""
+
+
+class JVInvalidOptionError(JVValidationError):
+    """Invalid option."""
+
+
+class JVInvalidFromTimeError(JVValidationError):
+    """Invalid from_datetime or to_date."""
+
+
+class JVInvalidKeyError(JVValidationError):
+    """Invalid realtime key."""
+
+
+class JVInvalidParameterError(JVValidationError):
+    """Invalid parameter other than key."""
+
+
+class JVNoDataError(JVDataError):
+    """Compatibility exception for no-data conditions."""
+
+
+# Mapping from JV-Link error codes to specific exception types.
+# Used by the transport layer to raise precise exceptions.
+_ERROR_CODE_MAP: dict[int, type[JVLinkError]] = {
+    -1: JVNoDataError,
+    -111: JVInvalidDataSpecError,
+    -112: JVInvalidParameterError,
+    -113: JVInvalidFromTimeError,
+    -114: JVInvalidKeyError,
+    -115: JVInvalidOptionError,
+    -116: JVInvalidParameterError,
+    -118: JVInvalidParameterError,
+    -301: JVAuthError,
+    -302: JVAuthError,
+    -303: JVAuthError,
+    -304: JVAuthError,
+    -305: JVAuthError,
+    -402: JVFileCorruptedError,
+    -403: JVFileCorruptedError,
+}
+
+
+def build_error_for_code(
+    error_code: int,
+    message: str,
+    *,
+    default_exc: type[JVLinkError] = JVOpenError,
+) -> JVLinkError:
+    """Build the appropriate exception instance for a JV-Link error code."""
+    exc_cls = _ERROR_CODE_MAP.get(error_code, default_exc)
+    try:
+        return exc_cls(message, error_code=error_code)  # type: ignore[call-arg]
+    except TypeError:
+        # Validation errors do not accept error_code in the constructor.
+        exc = exc_cls(message)
+        exc.error_code = error_code  # type: ignore[attr-defined]
+        return exc
+
+
+def raise_for_error_code(
+    error_code: int,
+    message: str,
+    *,
+    default_exc: type[JVLinkError] = JVOpenError,
+) -> NoReturn:
+    """Raise the appropriate exception for a JV-Link error code."""
+    raise build_error_for_code(error_code, message, default_exc=default_exc)
+
+
+__all__ = [
+    "JVAuthError",
+    "JVConnectionError",
+    "JVDataError",
+    "JVFileCorruptedError",
+    "JVInvalidDataSpecError",
+    "JVInvalidFromTimeError",
+    "JVInvalidKeyError",
+    "JVInvalidOptionError",
+    "JVInvalidParameterError",
+    "JVLinkError",
+    "JVNoDataError",
+    "JVOpenError",
+    "JVServerError",
+    "JVTimeoutError",
+    "JVValidationError",
+    "build_error_for_code",
+    "raise_for_error_code",
+]

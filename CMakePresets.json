@@ -1,0 +1,44 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "vs2022-win32-common",
+      "hidden": true,
+      "generator": "Visual Studio 17 2022",
+      "architecture": "Win32",
+      "binaryDir": "${sourceDir}/build"
+    },
+    {
+      "name": "vs2022-win32-release",
+      "displayName": "Visual Studio 2022 - Win32 Release",
+      "description": "Builds for Win32 with Visual Studio 2022 (Release).",
+      "inherits": "vs2022-win32-common",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "vs2022-win32-debug",
+      "displayName": "Visual Studio 2022 - Win32 Debug",
+      "description": "Builds for Win32 with Visual Studio 2022 (Debug).",
+      "inherits": "vs2022-win32-common",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "release",
+      "displayName": "Build Release",
+      "configurePreset": "vs2022-win32-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "debug",
+      "displayName": "Build Debug",
+      "configurePreset": "vs2022-win32-debug",
+      "configuration": "Debug"
+    }
+  ]
+} 

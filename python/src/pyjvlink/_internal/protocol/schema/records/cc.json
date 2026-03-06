@@ -1,0 +1,67 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "CC",
+  "title": "コース変更",
+  "record_length": 50,
+  "key_fields": ["meet_year", "meet_date", "racecourse_code", "meet_round", "meet_day", "race_number"],
+  "common_fields_ref": "../_common_race_fields.json",
+  "has_announcement_datetime": true,
+  "fields": [
+    {
+      "name": "announcement_datetime",
+      "item_number": 10,
+      "wire_type": "string",
+      "semantic_type": "datetime_mmddhhmm",
+      "byte_position": 28,
+      "byte_size": 8,
+      "display": {"label": "発表月日時分", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "after_distance",
+      "item_number": 11,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 36,
+      "byte_size": 4,
+      "unit": "meters",
+      "display": {"label": "変更後距離", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "after_track_code",
+      "item_number": 12,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 40,
+      "byte_size": 2,
+      "display": {"label": "変更後トラックコード", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "before_distance",
+      "item_number": 13,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 42,
+      "byte_size": 4,
+      "unit": "meters",
+      "display": {"label": "変更前距離", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "before_track_code",
+      "item_number": 14,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 46,
+      "byte_size": 2,
+      "display": {"label": "変更前トラックコード", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "reason_code",
+      "item_number": 15,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 48,
+      "byte_size": 1,
+      "display": {"label": "事由区分", "width_type": "half", "char_count": 1}
+    }
+  ]
+}

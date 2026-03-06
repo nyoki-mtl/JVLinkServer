@@ -1,0 +1,559 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "HR",
+  "title": "払戻",
+  "record_length": 719,
+  "key_fields": ["meet_year", "meet_date", "racecourse_code", "meet_round", "meet_day", "race_number"],
+  "common_fields_ref": "../_common_race_fields.json",
+  "fields": [
+    {
+      "name": "num_entries",
+      "item_number": 10,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 28,
+      "byte_size": 2,
+      "display": {"label": "登録頭数", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "num_starters",
+      "item_number": 11,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 30,
+      "byte_size": 2,
+      "display": {"label": "出走頭数", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "win_cancelled_flag",
+      "item_number": 12,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 32,
+      "byte_size": 1,
+      "display": {"label": "不成立フラグ 単勝", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "place_cancelled_flag",
+      "item_number": 13,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 33,
+      "byte_size": 1,
+      "display": {"label": "不成立フラグ 複勝", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "bracket_quinella_cancelled_flag",
+      "item_number": 14,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 34,
+      "byte_size": 1,
+      "display": {"label": "不成立フラグ 枠連", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "quinella_cancelled_flag",
+      "item_number": 15,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 35,
+      "byte_size": 1,
+      "display": {"label": "不成立フラグ 馬連", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "wide_cancelled_flag",
+      "item_number": 16,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 36,
+      "byte_size": 1,
+      "display": {"label": "不成立フラグ ワイド", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "exacta_cancelled_flag",
+      "item_number": 18,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 38,
+      "byte_size": 1,
+      "display": {"label": "不成立フラグ 馬単", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "trio_cancelled_flag",
+      "item_number": 19,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 39,
+      "byte_size": 1,
+      "display": {"label": "不成立フラグ 3連複", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "trifecta_cancelled_flag",
+      "item_number": 20,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 40,
+      "byte_size": 1,
+      "display": {"label": "不成立フラグ 3連単", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "win_special_payout_flag",
+      "item_number": 21,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 41,
+      "byte_size": 1,
+      "display": {"label": "特払フラグ 単勝", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "place_special_payout_flag",
+      "item_number": 22,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 42,
+      "byte_size": 1,
+      "display": {"label": "特払フラグ 複勝", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "bracket_quinella_special_payout_flag",
+      "item_number": 23,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 43,
+      "byte_size": 1,
+      "display": {"label": "特払フラグ 枠連", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "quinella_special_payout_flag",
+      "item_number": 24,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 44,
+      "byte_size": 1,
+      "display": {"label": "特払フラグ 馬連", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "wide_special_payout_flag",
+      "item_number": 25,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 45,
+      "byte_size": 1,
+      "display": {"label": "特払フラグ ワイド", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "exacta_special_payout_flag",
+      "item_number": 27,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 47,
+      "byte_size": 1,
+      "display": {"label": "特払フラグ 馬単", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "trio_special_payout_flag",
+      "item_number": 28,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 48,
+      "byte_size": 1,
+      "display": {"label": "特払フラグ 3連複", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "trifecta_special_payout_flag",
+      "item_number": 29,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 49,
+      "byte_size": 1,
+      "display": {"label": "特払フラグ 3連単", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "win_refund_flag",
+      "item_number": 30,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 50,
+      "byte_size": 1,
+      "display": {"label": "返還フラグ 単勝", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "place_refund_flag",
+      "item_number": 31,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 51,
+      "byte_size": 1,
+      "display": {"label": "返還フラグ 複勝", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "bracket_quinella_refund_flag",
+      "item_number": 32,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 52,
+      "byte_size": 1,
+      "display": {"label": "返還フラグ 枠連", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "quinella_refund_flag",
+      "item_number": 33,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 53,
+      "byte_size": 1,
+      "display": {"label": "返還フラグ 馬連", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "wide_refund_flag",
+      "item_number": 34,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 54,
+      "byte_size": 1,
+      "display": {"label": "返還フラグ ワイド", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "exacta_refund_flag",
+      "item_number": 36,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 56,
+      "byte_size": 1,
+      "display": {"label": "返還フラグ 馬単", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "trio_refund_flag",
+      "item_number": 37,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 57,
+      "byte_size": 1,
+      "display": {"label": "返還フラグ 3連複", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "trifecta_refund_flag",
+      "item_number": 38,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 58,
+      "byte_size": 1,
+      "display": {"label": "返還フラグ 3連単", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "refund_horse_number_info_28",
+      "item_number": 39,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 59,
+      "byte_size": 28,
+      "display": {"label": "返還馬番情報", "width_type": "half", "char_count": 28}
+    },
+    {
+      "name": "refund_bracket_info",
+      "item_number": 40,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 87,
+      "byte_size": 8,
+      "display": {"label": "返還枠番情報", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "refund_same_bracket_info",
+      "item_number": 41,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 95,
+      "byte_size": 8,
+      "display": {"label": "返還同枠情報", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "win_payback",
+      "item_number": 42,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 103,
+      "byte_size": 39,
+      "display": {"label": "単勝払戻"},
+      "array_info": {"element_size": 13, "count": 3},
+      "element_fields": [
+        {
+          "name": "number",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 2,
+          "display": {"label": "馬番", "width_type": "half", "char_count": 2}
+        },
+        {
+          "name": "payout",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 2,
+          "byte_size": 9,
+          "display": {"label": "払戻金", "width_type": "half", "char_count": 9}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 11,
+          "byte_size": 2,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 2}
+        }
+      ]
+    },
+    {
+      "name": "place_payback",
+      "item_number": 43,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 142,
+      "byte_size": 65,
+      "display": {"label": "複勝払戻"},
+      "array_info": {"element_size": 13, "count": 5},
+      "element_fields": [
+        {
+          "name": "number",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 2,
+          "display": {"label": "馬番", "width_type": "half", "char_count": 2}
+        },
+        {
+          "name": "payout",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 2,
+          "byte_size": 9,
+          "display": {"label": "払戻金", "width_type": "half", "char_count": 9}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 11,
+          "byte_size": 2,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 2}
+        }
+      ]
+    },
+    {
+      "name": "bracket_quinella_payback",
+      "item_number": 44,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 207,
+      "byte_size": 39,
+      "display": {"label": "枠連払戻"},
+      "array_info": {"element_size": 13, "count": 3},
+      "element_fields": [
+        {
+          "name": "number",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 2,
+          "display": {"label": "組番", "width_type": "half", "char_count": 2}
+        },
+        {
+          "name": "payout",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 2,
+          "byte_size": 9,
+          "display": {"label": "払戻金", "width_type": "half", "char_count": 9}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 11,
+          "byte_size": 2,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 2}
+        }
+      ]
+    },
+    {
+      "name": "quinella_payback",
+      "item_number": 45,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 246,
+      "byte_size": 48,
+      "display": {"label": "馬連払戻"},
+      "array_info": {"element_size": 16, "count": 3},
+      "element_fields": [
+        {
+          "name": "number",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 4,
+          "display": {"label": "組番", "width_type": "half", "char_count": 4}
+        },
+        {
+          "name": "payout",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 4,
+          "byte_size": 9,
+          "display": {"label": "払戻金", "width_type": "half", "char_count": 9}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 13,
+          "byte_size": 3,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 3}
+        }
+      ]
+    },
+    {
+      "name": "wide_payback",
+      "item_number": 46,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 294,
+      "byte_size": 112,
+      "display": {"label": "ワイド払戻"},
+      "array_info": {"element_size": 16, "count": 7},
+      "element_fields": [
+        {
+          "name": "number",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 4,
+          "display": {"label": "組番", "width_type": "half", "char_count": 4}
+        },
+        {
+          "name": "payout",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 4,
+          "byte_size": 9,
+          "display": {"label": "払戻金", "width_type": "half", "char_count": 9}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 13,
+          "byte_size": 3,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 3}
+        }
+      ]
+    },
+    {
+      "name": "exacta_payback",
+      "item_number": 48,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 454,
+      "byte_size": 96,
+      "display": {"label": "馬単払戻"},
+      "array_info": {"element_size": 16, "count": 6},
+      "element_fields": [
+        {
+          "name": "number",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 4,
+          "display": {"label": "組番", "width_type": "half", "char_count": 4}
+        },
+        {
+          "name": "payout",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 4,
+          "byte_size": 9,
+          "display": {"label": "払戻金", "width_type": "half", "char_count": 9}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 13,
+          "byte_size": 3,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 3}
+        }
+      ]
+    },
+    {
+      "name": "trio_payback",
+      "item_number": 49,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 550,
+      "byte_size": 54,
+      "display": {"label": "3連複払戻"},
+      "array_info": {"element_size": 18, "count": 3},
+      "element_fields": [
+        {
+          "name": "number",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 6,
+          "display": {"label": "組番", "width_type": "half", "char_count": 6}
+        },
+        {
+          "name": "payout",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 6,
+          "byte_size": 9,
+          "display": {"label": "払戻金", "width_type": "half", "char_count": 9}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 15,
+          "byte_size": 3,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 3}
+        }
+      ]
+    },
+    {
+      "name": "trifecta_payback",
+      "item_number": 50,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 604,
+      "byte_size": 114,
+      "display": {"label": "3連単払戻"},
+      "array_info": {"element_size": 19, "count": 6},
+      "element_fields": [
+        {
+          "name": "number",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 6,
+          "display": {"label": "組番", "width_type": "half", "char_count": 6}
+        },
+        {
+          "name": "payout",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 6,
+          "byte_size": 9,
+          "display": {"label": "払戻金", "width_type": "half", "char_count": 9}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 15,
+          "byte_size": 4,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 4}
+        }
+      ]
+    }
+  ]
+}

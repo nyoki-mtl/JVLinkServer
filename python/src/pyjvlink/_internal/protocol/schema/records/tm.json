@@ -1,0 +1,48 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "TM",
+  "title": "対戦型データマイニング予想",
+  "record_length": 141,
+  "key_fields": ["meet_year", "meet_date", "racecourse_code", "meet_round", "meet_day", "race_number"],
+  "common_fields_ref": "../_common_race_fields.json",
+  "fields": [
+    {
+      "name": "data_creation_time",
+      "item_number": 10,
+      "wire_type": "string",
+      "semantic_type": "time_hhmm",
+      "byte_position": 28,
+      "byte_size": 4,
+      "display": {"label": "データ作成時分", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "mining_predictions",
+      "item_number": 11,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 32,
+      "byte_size": 108,
+      "display": {"label": "マイニング予想"},
+      "array_info": {"element_size": 6, "count": 18},
+      "element_fields": [
+        {
+          "name": "horse_number",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 0,
+          "byte_size": 2,
+          "display": {"label": "馬番", "width_type": "half", "char_count": 2}
+        },
+        {
+          "name": "prediction_score",
+          "wire_type": "string",
+          "semantic_type": "float",
+          "byte_offset": 2,
+          "byte_size": 4,
+          "scale": 10,
+          "display": {"label": "予測スコア", "width_type": "half", "char_count": 4}
+        }
+      ]
+    }
+  ]
+}

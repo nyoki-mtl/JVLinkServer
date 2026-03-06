@@ -1,0 +1,258 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "WC",
+  "title": "ウッドチップ調教",
+  "record_length": 105,
+  "key_fields": ["training_center_code", "training_date", "training_time", "pedigree_reg_num"],
+  "common_header_fields_ref": "../_common_header_fields.json",
+  "fields": [
+    {
+      "name": "training_center_code",
+      "item_number": 4,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 12,
+      "byte_size": 1,
+      "is_key": true,
+      "display": {"label": "トレセン区分", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "training_date",
+      "item_number": 5,
+      "wire_type": "string",
+      "semantic_type": "date_yyyymmdd",
+      "byte_position": 13,
+      "byte_size": 8,
+      "is_key": true,
+      "display": {"label": "調教年月日", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "training_time",
+      "item_number": 6,
+      "wire_type": "string",
+      "semantic_type": "time_hhmm",
+      "byte_position": 21,
+      "byte_size": 4,
+      "is_key": true,
+      "display": {"label": "調教時刻", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "pedigree_reg_num",
+      "item_number": 7,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 25,
+      "byte_size": 10,
+      "is_key": true,
+      "display": {"label": "血統登録番号", "width_type": "half", "char_count": 10}
+    },
+    {
+      "name": "course",
+      "item_number": 8,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 35,
+      "byte_size": 1,
+      "display": {"label": "コース", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "track_direction",
+      "item_number": 9,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 36,
+      "byte_size": 1,
+      "display": {"label": "馬場周り", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "total_time_10f",
+      "item_number": 11,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 38,
+      "byte_size": 4,
+      "unit": "0.1s",
+      "display": {"label": "10ハロンタイム合計", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "lap_time_2000_1800",
+      "item_number": 12,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 42,
+      "byte_size": 3,
+      "unit": "0.1s",
+      "display": {"label": "ラップタイム 2000M-1800M", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "total_time_9f",
+      "item_number": 13,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 45,
+      "byte_size": 4,
+      "unit": "0.1s",
+      "display": {"label": "9ハロンタイム合計", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "lap_time_1800_1600",
+      "item_number": 14,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 49,
+      "byte_size": 3,
+      "unit": "0.1s",
+      "display": {"label": "ラップタイム 1800M-1600M", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "total_time_8f",
+      "item_number": 15,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 52,
+      "byte_size": 4,
+      "unit": "0.1s",
+      "display": {"label": "8ハロンタイム合計", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "lap_time_1600_1400",
+      "item_number": 16,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 56,
+      "byte_size": 3,
+      "unit": "0.1s",
+      "display": {"label": "ラップタイム 1600M-1400M", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "total_time_7f",
+      "item_number": 17,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 59,
+      "byte_size": 4,
+      "unit": "0.1s",
+      "display": {"label": "7ハロンタイム合計", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "lap_time_1400_1200",
+      "item_number": 18,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 63,
+      "byte_size": 3,
+      "unit": "0.1s",
+      "display": {"label": "ラップタイム 1400M-1200M", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "total_time_6f",
+      "item_number": 19,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 66,
+      "byte_size": 4,
+      "unit": "0.1s",
+      "display": {"label": "6ハロンタイム合計", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "lap_time_1200_1000",
+      "item_number": 20,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 70,
+      "byte_size": 3,
+      "unit": "0.1s",
+      "display": {"label": "ラップタイム 1200M-1000M", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "total_time_5f",
+      "item_number": 21,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 73,
+      "byte_size": 4,
+      "unit": "0.1s",
+      "display": {"label": "5ハロンタイム合計", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "lap_time_1000_800",
+      "item_number": 22,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 77,
+      "byte_size": 3,
+      "unit": "0.1s",
+      "display": {"label": "ラップタイム 1000M-800M", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "total_time_4f",
+      "item_number": 23,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 80,
+      "byte_size": 4,
+      "unit": "0.1s",
+      "display": {"label": "4ハロンタイム合計", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "lap_time_800_600",
+      "item_number": 24,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 84,
+      "byte_size": 3,
+      "unit": "0.1s",
+      "display": {"label": "ラップタイム 800M-600M", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "total_time_3f",
+      "item_number": 25,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 87,
+      "byte_size": 4,
+      "unit": "0.1s",
+      "display": {"label": "3ハロンタイム合計", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "lap_time_600_400",
+      "item_number": 26,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 91,
+      "byte_size": 3,
+      "unit": "0.1s",
+      "display": {"label": "ラップタイム 600M-400M", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "total_time_2f",
+      "item_number": 27,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 94,
+      "byte_size": 4,
+      "unit": "0.1s",
+      "display": {"label": "2ハロンタイム合計", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "lap_time_400_200",
+      "item_number": 28,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 98,
+      "byte_size": 3,
+      "unit": "0.1s",
+      "display": {"label": "ラップタイム 400M-200M", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "lap_time_200_0",
+      "item_number": 29,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 101,
+      "byte_size": 3,
+      "unit": "0.1s",
+      "display": {"label": "ラップタイム 200M-0M", "width_type": "half", "char_count": 3}
+    }
+  ]
+}

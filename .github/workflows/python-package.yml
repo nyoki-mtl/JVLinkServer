@@ -1,0 +1,139 @@
+name: Python package
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'python/**'
+      - '.github/workflows/python-package.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'python/**'
+      - '.github/workflows/python-package.yml'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Install dependencies
+      working-directory: python
+      run: uv sync --all-extras
+
+    - name: Lint with ruff
+      working-directory: python
+      run: uv run ruff check src/ tests/
+
+    - name: Format check with ruff
+      working-directory: python
+      run: uv run ruff format --check src/ tests/
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Install dependencies
+      working-directory: python
+      run: uv sync --all-extras
+
+    - name: Type check with ty
+      working-directory: python
+      run: uv run ty check src/pyjvlink
+
+  test:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Install dependencies
+      working-directory: python
+      run: uv sync --all-extras
+
+    - name: Test with pytest
+      working-directory: python
+      env:
+        JVLINK_SKIP_TESTS: "true"
+      run: uv run pytest tests/ -v --tb=short
+
+    - name: Generate coverage report
+      if: matrix.python-version == '3.12'
+      working-directory: python
+      env:
+        JVLINK_SKIP_TESTS: "true"
+      run: uv run pytest tests/ --cov=src/pyjvlink --cov-report=xml --cov-report=term
+
+    - name: Upload coverage to Codecov
+      if: matrix.python-version == '3.12'
+      uses: codecov/codecov-action@v4
+      with:
+        directory: ./python
+        file: ./python/coverage.xml
+        flags: python
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  build:
+    needs: [lint, test]
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Install dependencies
+      working-directory: python
+      run: uv sync --all-extras
+
+    - name: Build package
+      working-directory: python
+      run: uv build --wheel
+
+    - name: Check package
+      working-directory: python
+      run: |
+        pip install --upgrade twine
+        python -m twine check dist/*
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-distributions
+        path: python/dist/

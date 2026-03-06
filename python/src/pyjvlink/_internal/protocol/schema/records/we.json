@@ -1,0 +1,134 @@
+{
+  "$schema": "../_meta.json",
+  "$comment": "WE does not have race_number (item 9 from common race fields); items 2-8 are shared.",
+  "record_type": "WE",
+  "title": "天候馬場状態",
+  "record_length": 42,
+  "key_fields": ["meet_year", "meet_date", "racecourse_code", "meet_round", "meet_day", "announcement_datetime", "change_identifier"],
+  "common_header_fields_ref": "../_common_header_fields.json",
+  "has_announcement_datetime": true,
+  "fields": [
+    {
+      "name": "meet_year",
+      "item_number": 4,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 12,
+      "byte_size": 4,
+      "is_key": true,
+      "display": {"label": "開催年", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "meet_date",
+      "item_number": 5,
+      "wire_type": "string",
+      "semantic_type": "date_mmdd",
+      "byte_position": 16,
+      "byte_size": 4,
+      "is_key": true,
+      "display": {"label": "開催月日", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "racecourse_code",
+      "item_number": 6,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 20,
+      "byte_size": 2,
+      "is_key": true,
+      "display": {"label": "競馬場コード", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "meet_round",
+      "item_number": 7,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 22,
+      "byte_size": 2,
+      "is_key": true,
+      "display": {"label": "開催回", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "meet_day",
+      "item_number": 8,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 24,
+      "byte_size": 2,
+      "is_key": true,
+      "display": {"label": "開催日目", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "announcement_datetime",
+      "item_number": 9,
+      "wire_type": "string",
+      "semantic_type": "datetime_mmddhhmm",
+      "byte_position": 26,
+      "byte_size": 8,
+      "display": {"label": "発表月日時分", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "change_identifier",
+      "item_number": 10,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 34,
+      "byte_size": 1,
+      "display": {"label": "変更識別", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "weather_code",
+      "item_number": 11,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 35,
+      "byte_size": 1,
+      "display": {"label": "天候状態", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "turf_track_condition_code",
+      "item_number": 12,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 36,
+      "byte_size": 1,
+      "display": {"label": "馬場状態・芝", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "dirt_track_condition_code",
+      "item_number": 13,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 37,
+      "byte_size": 1,
+      "display": {"label": "馬場状態・ダート", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "before_weather_code",
+      "item_number": 14,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 38,
+      "byte_size": 1,
+      "display": {"label": "変更前天候状態", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "before_turf_track_condition_code",
+      "item_number": 15,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 39,
+      "byte_size": 1,
+      "display": {"label": "変更前馬場状態・芝", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "before_dirt_track_condition_code",
+      "item_number": 16,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 40,
+      "byte_size": 1,
+      "display": {"label": "変更前馬場状態・ダート", "width_type": "half", "char_count": 1}
+    }
+  ]
+}

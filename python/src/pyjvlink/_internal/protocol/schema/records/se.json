@@ -1,0 +1,534 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "SE",
+  "title": "馬毎レース情報",
+  "record_length": 555,
+  "key_fields": ["meet_year", "meet_date", "racecourse_code", "meet_round", "meet_day", "race_number", "horse_number", "pedigree_reg_num"],
+  "common_fields_ref": "../_common_race_fields.json",
+  "fields": [
+    {
+      "name": "bracket_number",
+      "item_number": 10,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 28,
+      "byte_size": 1,
+      "display": {"label": "枠番", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "horse_number",
+      "item_number": 11,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 29,
+      "byte_size": 2,
+      "is_key": true,
+      "display": {"label": "馬番", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "pedigree_reg_num",
+      "item_number": 12,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 31,
+      "byte_size": 10,
+      "is_key": true,
+      "display": {"label": "血統登録番号", "width_type": "half", "char_count": 10}
+    },
+    {
+      "name": "horse_name",
+      "item_number": 13,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 41,
+      "byte_size": 36,
+      "display": {"label": "馬名", "width_type": "mixed", "char_count": 18}
+    },
+    {
+      "name": "horse_symbol_code",
+      "item_number": 14,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 77,
+      "byte_size": 2,
+      "display": {"label": "馬記号コード", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "horse_sex_code",
+      "item_number": 15,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 79,
+      "byte_size": 1,
+      "display": {"label": "性別コード", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "breed_code",
+      "item_number": 16,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 80,
+      "byte_size": 1,
+      "display": {"label": "品種コード", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "coat_color_code",
+      "item_number": 17,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 81,
+      "byte_size": 2,
+      "display": {"label": "毛色コード", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "horse_age",
+      "item_number": 18,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 83,
+      "byte_size": 2,
+      "display": {"label": "馬齢", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "east_west_affiliation_code",
+      "item_number": 19,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 85,
+      "byte_size": 1,
+      "display": {"label": "東西所属コード", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "trainer_code",
+      "item_number": 20,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 86,
+      "byte_size": 5,
+      "display": {"label": "調教師コード", "width_type": "half", "char_count": 5}
+    },
+    {
+      "name": "trainer_short_name",
+      "item_number": 21,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 91,
+      "byte_size": 8,
+      "display": {"label": "調教師名略称", "width_type": "full", "char_count": 4}
+    },
+    {
+      "name": "owner_code",
+      "item_number": 22,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 99,
+      "byte_size": 6,
+      "display": {"label": "馬主コード", "width_type": "half", "char_count": 6}
+    },
+    {
+      "name": "owner_name_individual",
+      "item_number": 23,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 105,
+      "byte_size": 64,
+      "display": {"label": "馬主名(法人格無)", "width_type": "mixed", "char_count": 32}
+    },
+    {
+      "name": "silk_colors",
+      "item_number": 24,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 169,
+      "byte_size": 60,
+      "display": {"label": "服色標示", "width_type": "full", "char_count": 30}
+    },
+    {
+      "name": "carrying_weight",
+      "item_number": 26,
+      "wire_type": "string",
+      "semantic_type": "float",
+      "byte_position": 289,
+      "byte_size": 3,
+      "scale": 10,
+      "unit": "0.1kg",
+      "display": {"label": "負担重量", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "before_carrying_weight",
+      "item_number": 27,
+      "wire_type": "string",
+      "semantic_type": "float",
+      "byte_position": 292,
+      "byte_size": 3,
+      "scale": 10,
+      "unit": "0.1kg",
+      "display": {"label": "変更前負担重量", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "blinker_usage_code",
+      "item_number": 28,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 295,
+      "byte_size": 1,
+      "display": {"label": "ブリンカー使用区分", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "jockey_code",
+      "item_number": 30,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 297,
+      "byte_size": 5,
+      "display": {"label": "騎手コード", "width_type": "half", "char_count": 5}
+    },
+    {
+      "name": "before_jockey_code",
+      "item_number": 31,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 302,
+      "byte_size": 5,
+      "display": {"label": "変更前騎手コード", "width_type": "half", "char_count": 5}
+    },
+    {
+      "name": "jockey_short_name",
+      "item_number": 32,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 307,
+      "byte_size": 8,
+      "display": {"label": "騎手名略称", "width_type": "full", "char_count": 4}
+    },
+    {
+      "name": "before_jockey_short_name",
+      "item_number": 33,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 315,
+      "byte_size": 8,
+      "display": {"label": "変更前騎手名略称", "width_type": "full", "char_count": 4}
+    },
+    {
+      "name": "jockey_apprentice_code",
+      "item_number": 34,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 323,
+      "byte_size": 1,
+      "display": {"label": "騎手見習コード", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "before_jockey_apprentice_code",
+      "item_number": 35,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 324,
+      "byte_size": 1,
+      "display": {"label": "変更前騎手見習コード", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "horse_weight",
+      "item_number": 36,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 325,
+      "byte_size": 3,
+      "unit": "kg",
+      "display": {"label": "馬体重", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "weight_change_sign",
+      "item_number": 37,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 328,
+      "byte_size": 1,
+      "display": {"label": "増減符号", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "weight_change_diff",
+      "item_number": 38,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 329,
+      "byte_size": 3,
+      "unit": "kg",
+      "display": {"label": "増減差", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "abnormality_code",
+      "item_number": 39,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 332,
+      "byte_size": 1,
+      "display": {"label": "異常区分コード", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "finish_order",
+      "item_number": 40,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 333,
+      "byte_size": 2,
+      "display": {"label": "入線順位", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "confirmed_placing",
+      "item_number": 41,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 335,
+      "byte_size": 2,
+      "display": {"label": "確定着順", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "dead_heat_code",
+      "item_number": 42,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 337,
+      "byte_size": 1,
+      "display": {"label": "同着区分", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "dead_heat_count",
+      "item_number": 43,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 338,
+      "byte_size": 1,
+      "display": {"label": "同着頭数", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "finish_time",
+      "item_number": 44,
+      "wire_type": "string",
+      "semantic_type": "duration_mss_s",
+      "byte_position": 339,
+      "byte_size": 4,
+      "display": {"label": "走破タイム", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "margin_code",
+      "item_number": 45,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 343,
+      "byte_size": 3,
+      "display": {"label": "着差コード", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "margin_code_plus",
+      "item_number": 46,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 346,
+      "byte_size": 3,
+      "display": {"label": "+着差コード", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "margin_code_plus_plus",
+      "item_number": 47,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 349,
+      "byte_size": 3,
+      "display": {"label": "++着差コード", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "corner1_position",
+      "item_number": 48,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 352,
+      "byte_size": 2,
+      "display": {"label": "1コーナーでの順位", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "corner2_position",
+      "item_number": 49,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 354,
+      "byte_size": 2,
+      "display": {"label": "2コーナーでの順位", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "corner3_position",
+      "item_number": 50,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 356,
+      "byte_size": 2,
+      "display": {"label": "3コーナーでの順位", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "corner4_position",
+      "item_number": 51,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 358,
+      "byte_size": 2,
+      "display": {"label": "4コーナーでの順位", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "win_odds",
+      "item_number": 52,
+      "wire_type": "string",
+      "semantic_type": "float",
+      "byte_position": 360,
+      "byte_size": 4,
+      "scale": 10,
+      "display": {"label": "単勝オッズ", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "win_popularity_rank",
+      "item_number": 53,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 364,
+      "byte_size": 2,
+      "display": {"label": "単勝人気順", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "earned_purse_money",
+      "item_number": 54,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 366,
+      "byte_size": 8,
+      "display": {"label": "獲得本賞金", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "earned_added_money",
+      "item_number": 55,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 374,
+      "byte_size": 8,
+      "display": {"label": "獲得付加賞金", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "last_4f_time",
+      "item_number": 58,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 388,
+      "byte_size": 3,
+      "display": {"label": "後4ハロンタイム", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "last_3f_time",
+      "item_number": 59,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_s",
+      "byte_position": 391,
+      "byte_size": 3,
+      "display": {"label": "後3ハロンタイム", "width_type": "half", "char_count": 3}
+    },
+    {
+      "name": "opponent_horses",
+      "item_number": 60,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 394,
+      "byte_size": 138,
+      "display": {"label": "1着馬(相手馬)情報"},
+      "array_info": {"element_size": 46, "count": 3},
+      "element_fields": [
+        {
+          "name": "pedigree_reg_num",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 10,
+          "display": {"label": "血統登録番号", "width_type": "half", "char_count": 10}
+        },
+        {
+          "name": "horse_name",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 10,
+          "byte_size": 36,
+          "display": {"label": "馬名", "width_type": "mixed", "char_count": 18}
+        }
+      ]
+    },
+    {
+      "name": "time_diff",
+      "item_number": 61,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 532,
+      "byte_size": 4,
+      "unit": "0.1s",
+      "display": {"label": "タイム差", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "record_update_code",
+      "item_number": 62,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 536,
+      "byte_size": 1,
+      "display": {"label": "レコード更新区分", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "mining_code",
+      "item_number": 63,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 537,
+      "byte_size": 1,
+      "display": {"label": "マイニング区分", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "mining_pred_finish_time",
+      "item_number": 64,
+      "wire_type": "string",
+      "semantic_type": "duration_mss_ss",
+      "byte_position": 538,
+      "byte_size": 5,
+      "display": {"label": "マイニング予想走破タイム", "width_type": "half", "char_count": 5}
+    },
+    {
+      "name": "mining_pred_err_margin_plus",
+      "item_number": 65,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_ss",
+      "byte_position": 543,
+      "byte_size": 4,
+      "display": {"label": "マイニング予想誤差+", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "mining_pred_err_margin_minus",
+      "item_number": 66,
+      "wire_type": "string",
+      "semantic_type": "duration_ss_ss",
+      "byte_position": 547,
+      "byte_size": 4,
+      "display": {"label": "マイニング予想誤差-", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "mining_pred_rank",
+      "item_number": 67,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 551,
+      "byte_size": 2,
+      "display": {"label": "マイニング予想順位", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "current_race_running_style_judgement",
+      "item_number": 68,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 553,
+      "byte_size": 1,
+      "display": {"label": "今回レース脚質判定", "width_type": "half", "char_count": 1}
+    }
+  ]
+}

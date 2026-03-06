@@ -1,0 +1,60 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "CS",
+  "title": "コース情報",
+  "record_length": 6829,
+  "key_fields": ["racecourse_code", "distance", "track_code", "course_revision_date"],
+  "common_header_fields_ref": "../_common_header_fields.json",
+  "fields": [
+    {
+      "name": "racecourse_code",
+      "item_number": 4,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 12,
+      "byte_size": 2,
+      "is_key": true,
+      "display": {"label": "競馬場コード", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "distance",
+      "item_number": 5,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 14,
+      "byte_size": 4,
+      "unit": "meters",
+      "is_key": true,
+      "display": {"label": "距離", "width_type": "half", "char_count": 4}
+    },
+    {
+      "name": "track_code",
+      "item_number": 6,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 18,
+      "byte_size": 2,
+      "is_key": true,
+      "display": {"label": "トラックコード", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "course_revision_date",
+      "item_number": 7,
+      "wire_type": "string",
+      "semantic_type": "date_yyyymmdd",
+      "byte_position": 20,
+      "byte_size": 8,
+      "is_key": true,
+      "display": {"label": "コース改修年月日", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "course_description",
+      "item_number": 8,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 28,
+      "byte_size": 6800,
+      "display": {"label": "コース説明", "width_type": "mixed", "char_count": 6800}
+    }
+  ]
+}

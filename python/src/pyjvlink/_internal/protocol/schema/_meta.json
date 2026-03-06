@@ -1,0 +1,46 @@
+{
+  "$comment": "Meta-schema: defines the structure of pyjvlink record schemas.",
+  "record_schema": {
+    "required_keys": ["record_type", "title", "record_length", "key_fields", "fields"],
+    "optional_keys": ["$schema", "$comment", "has_announcement_datetime", "common_fields_ref", "common_header_fields_ref"]
+  },
+  "field": {
+    "required_keys": ["name", "item_number", "wire_type", "semantic_type", "byte_position", "byte_size"],
+    "optional_keys": ["display", "unit", "scale", "enum_ref", "is_key", "array_info", "element_fields"]
+  },
+  "element_field": {
+    "required_keys": ["name", "wire_type", "semantic_type", "byte_offset", "byte_size"],
+    "optional_keys": ["display", "unit", "scale", "enum_ref"]
+  },
+  "display": {
+    "required_keys": ["label"],
+    "optional_keys": ["width_type", "char_count"]
+  },
+  "array_info": {
+    "required_keys": ["element_size", "count"]
+  },
+  "semantic_types": [
+    "str",
+    "int",
+    "float",
+    "date_yyyymmdd",
+    "date_mmdd",
+    "time_hhmm",
+    "datetime_mmddhhmm",
+    "duration_ss_s",
+    "duration_mss_s",
+    "duration_mss_ss",
+    "duration_ss_ss",
+    "money_100yen",
+    "flag",
+    "reserved",
+    "array:int",
+    "array:str",
+    "array:float",
+    "array:money_100yen",
+    "array:duration_ss_s",
+    "array:object"
+  ],
+  "wire_types": ["string", "array"],
+  "width_types": ["half", "full", "mixed"]
+}

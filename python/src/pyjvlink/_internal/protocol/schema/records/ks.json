@@ -1,0 +1,821 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "KS",
+  "title": "騎手マスタ",
+  "record_length": 4173,
+  "key_fields": [
+    "jockey_code"
+  ],
+  "common_header_fields_ref": "../_common_header_fields.json",
+  "fields": [
+    {
+      "name": "jockey_code",
+      "item_number": 4,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 12,
+      "byte_size": 5,
+      "display": {
+        "label": "騎手コード",
+        "width_type": "half",
+        "char_count": 5
+      }
+    },
+    {
+      "name": "deregistration_flag",
+      "item_number": 5,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 17,
+      "byte_size": 1,
+      "display": {
+        "label": "騎手抹消区分",
+        "width_type": "half",
+        "char_count": 1
+      }
+    },
+    {
+      "name": "license_issue_date",
+      "item_number": 6,
+      "wire_type": "string",
+      "semantic_type": "date_yyyymmdd",
+      "byte_position": 18,
+      "byte_size": 8,
+      "display": {
+        "label": "騎手免許交付年月日",
+        "width_type": "half",
+        "char_count": 8
+      }
+    },
+    {
+      "name": "license_revoked_date",
+      "item_number": 7,
+      "wire_type": "string",
+      "semantic_type": "date_yyyymmdd",
+      "byte_position": 26,
+      "byte_size": 8,
+      "display": {
+        "label": "騎手免許抹消年月日",
+        "width_type": "half",
+        "char_count": 8
+      }
+    },
+    {
+      "name": "birth_date",
+      "item_number": 8,
+      "wire_type": "string",
+      "semantic_type": "date_yyyymmdd",
+      "byte_position": 34,
+      "byte_size": 8,
+      "display": {
+        "label": "生年月日",
+        "width_type": "half",
+        "char_count": 8
+      }
+    },
+    {
+      "name": "jockey_name",
+      "item_number": 9,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 42,
+      "byte_size": 34,
+      "display": {
+        "label": "騎手名",
+        "width_type": "full",
+        "char_count": 17
+      }
+    },
+    {
+      "name": "reserved_10",
+      "item_number": 10,
+      "wire_type": "string",
+      "semantic_type": "reserved",
+      "byte_position": 76,
+      "byte_size": 34,
+      "display": {
+        "label": "予備"
+      }
+    },
+    {
+      "name": "jockey_name_kana",
+      "item_number": 11,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 110,
+      "byte_size": 30,
+      "display": {
+        "label": "騎手名半角カナ",
+        "width_type": "half",
+        "char_count": 30
+      }
+    },
+    {
+      "name": "jockey_name_short",
+      "item_number": 12,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 140,
+      "byte_size": 8,
+      "display": {
+        "label": "騎手名略称",
+        "width_type": "full",
+        "char_count": 4
+      }
+    },
+    {
+      "name": "jockey_name_english",
+      "item_number": 13,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 148,
+      "byte_size": 80,
+      "display": {
+        "label": "騎手名欧字",
+        "width_type": "half",
+        "char_count": 80
+      }
+    },
+    {
+      "name": "sex_code",
+      "item_number": 14,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 228,
+      "byte_size": 1,
+      "display": {
+        "label": "性別区分",
+        "width_type": "half",
+        "char_count": 1
+      }
+    },
+    {
+      "name": "riding_qualification_code",
+      "item_number": 15,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 229,
+      "byte_size": 1,
+      "display": {
+        "label": "騎乗資格コード",
+        "width_type": "half",
+        "char_count": 1
+      }
+    },
+    {
+      "name": "jockey_apprentice_code",
+      "item_number": 16,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 230,
+      "byte_size": 1,
+      "display": {
+        "label": "騎手見習コード",
+        "width_type": "half",
+        "char_count": 1
+      }
+    },
+    {
+      "name": "affiliation_code",
+      "item_number": 17,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 231,
+      "byte_size": 1,
+      "display": {
+        "label": "騎手東西所属コード",
+        "width_type": "half",
+        "char_count": 1
+      }
+    },
+    {
+      "name": "invitation_area_name",
+      "item_number": 18,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 232,
+      "byte_size": 20,
+      "display": {
+        "label": "招待地域名",
+        "width_type": "full",
+        "char_count": 10
+      }
+    },
+    {
+      "name": "affiliated_trainer_code",
+      "item_number": 19,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 252,
+      "byte_size": 5,
+      "display": {
+        "label": "所属調教師コード",
+        "width_type": "half",
+        "char_count": 5
+      }
+    },
+    {
+      "name": "affiliated_trainer_name_short",
+      "item_number": 20,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 257,
+      "byte_size": 8,
+      "display": {
+        "label": "所属調教師名略称",
+        "width_type": "full",
+        "char_count": 4
+      }
+    },
+    {
+      "name": "first_ride_info",
+      "item_number": 21,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 265,
+      "byte_size": 134,
+      "display": {
+        "label": "初騎乗情報"
+      },
+      "array_info": {
+        "element_size": 67,
+        "count": 2
+      },
+      "element_fields": [
+        {
+          "name": "race_key",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 16,
+          "display": {
+            "label": "年月日場回日R",
+            "width_type": "half",
+            "char_count": 16
+          }
+        },
+        {
+          "name": "num_starters",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 16,
+          "byte_size": 2,
+          "display": {
+            "label": "出走頭数",
+            "width_type": "half",
+            "char_count": 2
+          }
+        },
+        {
+          "name": "pedigree_reg_num",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 18,
+          "byte_size": 10,
+          "display": {
+            "label": "血統登録番号",
+            "width_type": "half",
+            "char_count": 10
+          }
+        },
+        {
+          "name": "horse_name",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 28,
+          "byte_size": 36,
+          "display": {
+            "label": "馬名",
+            "width_type": "full",
+            "char_count": 18
+          }
+        },
+        {
+          "name": "confirmed_placing",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 64,
+          "byte_size": 2,
+          "display": {
+            "label": "確定着順",
+            "width_type": "half",
+            "char_count": 2
+          }
+        },
+        {
+          "name": "abnormality_code",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 66,
+          "byte_size": 1,
+          "display": {
+            "label": "異常区分コード",
+            "width_type": "half",
+            "char_count": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "first_win_info",
+      "item_number": 22,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 399,
+      "byte_size": 128,
+      "display": {
+        "label": "初勝利情報"
+      },
+      "array_info": {
+        "element_size": 64,
+        "count": 2
+      },
+      "element_fields": [
+        {
+          "name": "race_key",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 16,
+          "display": {
+            "label": "年月日場回日R",
+            "width_type": "half",
+            "char_count": 16
+          }
+        },
+        {
+          "name": "num_starters",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 16,
+          "byte_size": 2,
+          "display": {
+            "label": "出走頭数",
+            "width_type": "half",
+            "char_count": 2
+          }
+        },
+        {
+          "name": "pedigree_reg_num",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 18,
+          "byte_size": 10,
+          "display": {
+            "label": "血統登録番号",
+            "width_type": "half",
+            "char_count": 10
+          }
+        },
+        {
+          "name": "horse_name",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 28,
+          "byte_size": 36,
+          "display": {
+            "label": "馬名",
+            "width_type": "full",
+            "char_count": 18
+          }
+        }
+      ]
+    },
+    {
+      "name": "recent_graded_wins",
+      "item_number": 23,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 527,
+      "byte_size": 489,
+      "display": {
+        "label": "最近重賞勝利情報"
+      },
+      "array_info": {
+        "element_size": 163,
+        "count": 3
+      },
+      "element_fields": [
+        {
+          "name": "race_key",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 16,
+          "display": {
+            "label": "年月日場回日R",
+            "width_type": "half",
+            "char_count": 16
+          }
+        },
+        {
+          "name": "race_name_main",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 16,
+          "byte_size": 60,
+          "display": {
+            "label": "競走名本題",
+            "width_type": "full",
+            "char_count": 30
+          }
+        },
+        {
+          "name": "race_short_name_10",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 76,
+          "byte_size": 20,
+          "display": {
+            "label": "競走名略称10文字",
+            "width_type": "full",
+            "char_count": 10
+          }
+        },
+        {
+          "name": "race_short_name_6",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 96,
+          "byte_size": 12,
+          "display": {
+            "label": "競走名略称6文字",
+            "width_type": "full",
+            "char_count": 6
+          }
+        },
+        {
+          "name": "race_short_name_3",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 108,
+          "byte_size": 6,
+          "display": {
+            "label": "競走名略称3文字",
+            "width_type": "full",
+            "char_count": 3
+          }
+        },
+        {
+          "name": "grade_code",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 114,
+          "byte_size": 1,
+          "display": {
+            "label": "グレードコード",
+            "width_type": "half",
+            "char_count": 1
+          }
+        },
+        {
+          "name": "num_starters",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 115,
+          "byte_size": 2,
+          "display": {
+            "label": "出走頭数",
+            "width_type": "half",
+            "char_count": 2
+          }
+        },
+        {
+          "name": "pedigree_reg_num",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 117,
+          "byte_size": 10,
+          "display": {
+            "label": "血統登録番号",
+            "width_type": "half",
+            "char_count": 10
+          }
+        },
+        {
+          "name": "horse_name",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 127,
+          "byte_size": 36,
+          "display": {
+            "label": "馬名",
+            "width_type": "full",
+            "char_count": 18
+          }
+        }
+      ]
+    },
+    {
+      "name": "performance_stats",
+      "item_number": 24,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 1016,
+      "byte_size": 3156,
+      "display": {
+        "label": "本年前年累計成績情報"
+      },
+      "array_info": {
+        "element_size": 1052,
+        "count": 3
+      },
+      "element_fields": [
+        {
+          "name": "year",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 0,
+          "byte_size": 4,
+          "display": {
+            "label": "設定年",
+            "width_type": "half",
+            "char_count": 4
+          }
+        },
+        {
+          "name": "flat_prize_money",
+          "wire_type": "string",
+          "semantic_type": "money_100yen",
+          "byte_offset": 4,
+          "byte_size": 10,
+          "display": {
+            "label": "平地本賞金合計",
+            "width_type": "half",
+            "char_count": 10
+          }
+        },
+        {
+          "name": "steeplechase_prize_money",
+          "wire_type": "string",
+          "semantic_type": "money_100yen",
+          "byte_offset": 14,
+          "byte_size": 10,
+          "display": {
+            "label": "障害本賞金合計",
+            "width_type": "half",
+            "char_count": 10
+          }
+        },
+        {
+          "name": "flat_added_money",
+          "wire_type": "string",
+          "semantic_type": "money_100yen",
+          "byte_offset": 24,
+          "byte_size": 10,
+          "display": {
+            "label": "平地付加賞金合計",
+            "width_type": "half",
+            "char_count": 10
+          }
+        },
+        {
+          "name": "steeplechase_added_money",
+          "wire_type": "string",
+          "semantic_type": "money_100yen",
+          "byte_offset": 34,
+          "byte_size": 10,
+          "display": {
+            "label": "障害付加賞金合計",
+            "width_type": "half",
+            "char_count": 10
+          }
+        },
+        {
+          "name": "flat_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 44,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6},
+          "display": {
+            "label": "平地着回数",
+            "width_type": "half",
+            "char_count": 36
+          }
+        },
+        {
+          "name": "steeplechase_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 80,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6},
+          "display": {
+            "label": "障害着回数",
+            "width_type": "half",
+            "char_count": 36
+          }
+        },
+        {
+          "name": "sapporo_flat_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 116,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "sapporo_steeplechase_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 152,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "hakodate_flat_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 188,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "hakodate_steeplechase_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 224,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "fukushima_flat_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 260,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "fukushima_steeplechase_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 296,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "niigata_flat_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 332,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "niigata_steeplechase_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 368,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "tokyo_flat_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 404,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "tokyo_steeplechase_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 440,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "nakayama_flat_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 476,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "nakayama_steeplechase_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 512,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "chukyo_flat_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 548,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "chukyo_steeplechase_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 584,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "kyoto_flat_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 620,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "kyoto_steeplechase_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 656,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "hanshin_flat_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 692,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "hanshin_steeplechase_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 728,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "kokura_flat_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 764,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "kokura_steeplechase_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 800,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "turf_class_d_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 836,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "turf_class_e_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 872,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "turf_gt2200_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 908,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "dirt_class_d_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 944,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "dirt_class_e_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 980,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        },
+        {
+          "name": "dirt_gt2200_placing_counts",
+          "wire_type": "string",
+          "semantic_type": "array:int",
+          "byte_offset": 1016,
+          "byte_size": 36,
+          "array_info": {"element_size": 6, "count": 6}
+        }
+      ]
+    }
+  ]
+}

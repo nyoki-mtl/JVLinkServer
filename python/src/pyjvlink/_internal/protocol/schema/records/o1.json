@@ -1,0 +1,230 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "O1",
+  "title": "単複枠オッズ",
+  "record_length": 962,
+  "key_fields": ["meet_year", "meet_date", "racecourse_code", "meet_round", "meet_day", "race_number"],
+  "common_fields_ref": "../_common_race_fields.json",
+  "has_announcement_datetime": true,
+  "fields": [
+    {
+      "name": "announcement_datetime",
+      "item_number": 10,
+      "wire_type": "string",
+      "semantic_type": "datetime_mmddhhmm",
+      "byte_position": 28,
+      "byte_size": 8,
+      "display": {"label": "発表月日時分", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "num_entries",
+      "item_number": 11,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 36,
+      "byte_size": 2,
+      "display": {"label": "登録頭数", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "num_starters",
+      "item_number": 12,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 38,
+      "byte_size": 2,
+      "display": {"label": "出走頭数", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "win_sales_flag",
+      "item_number": 13,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 40,
+      "byte_size": 1,
+      "display": {"label": "発売フラグ 単勝", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "place_sales_flag",
+      "item_number": 14,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 41,
+      "byte_size": 1,
+      "display": {"label": "発売フラグ 複勝", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "bracket_quinella_sales_flag",
+      "item_number": 15,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 42,
+      "byte_size": 1,
+      "display": {"label": "発売フラグ 枠連", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "place_payout_key",
+      "item_number": 16,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 43,
+      "byte_size": 1,
+      "display": {"label": "複勝着払キー", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "win_odds",
+      "item_number": 17,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 44,
+      "byte_size": 224,
+      "display": {"label": "単勝オッズ"},
+      "array_info": {
+        "element_size": 8,
+        "count": 28
+      },
+      "element_fields": [
+        {
+          "name": "horse_number",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 0,
+          "byte_size": 2,
+          "display": {"label": "馬番", "width_type": "half", "char_count": 2}
+        },
+        {
+          "name": "odds",
+          "wire_type": "string",
+          "semantic_type": "float",
+          "byte_offset": 2,
+          "byte_size": 4,
+          "scale": 10,
+          "display": {"label": "オッズ", "width_type": "half", "char_count": 4}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 6,
+          "byte_size": 2,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 2}
+        }
+      ]
+    },
+    {
+      "name": "place_odds",
+      "item_number": 18,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 268,
+      "byte_size": 336,
+      "display": {"label": "複勝オッズ"},
+      "array_info": {
+        "element_size": 12,
+        "count": 28
+      },
+      "element_fields": [
+        {
+          "name": "horse_number",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 0,
+          "byte_size": 2,
+          "display": {"label": "馬番", "width_type": "half", "char_count": 2}
+        },
+        {
+          "name": "min_odds",
+          "wire_type": "string",
+          "semantic_type": "float",
+          "byte_offset": 2,
+          "byte_size": 4,
+          "scale": 10,
+          "display": {"label": "最低オッズ", "width_type": "half", "char_count": 4}
+        },
+        {
+          "name": "max_odds",
+          "wire_type": "string",
+          "semantic_type": "float",
+          "byte_offset": 6,
+          "byte_size": 4,
+          "scale": 10,
+          "display": {"label": "最高オッズ", "width_type": "half", "char_count": 4}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 10,
+          "byte_size": 2,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 2}
+        }
+      ]
+    },
+    {
+      "name": "bracket_quinella_odds",
+      "item_number": 19,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 604,
+      "byte_size": 324,
+      "display": {"label": "枠連オッズ"},
+      "array_info": {
+        "element_size": 9,
+        "count": 36
+      },
+      "element_fields": [
+        {
+          "name": "combination",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 2,
+          "display": {"label": "組番", "width_type": "half", "char_count": 2}
+        },
+        {
+          "name": "odds",
+          "wire_type": "string",
+          "semantic_type": "float",
+          "byte_offset": 2,
+          "byte_size": 5,
+          "scale": 10,
+          "display": {"label": "オッズ", "width_type": "half", "char_count": 5}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 7,
+          "byte_size": 2,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 2}
+        }
+      ]
+    },
+    {
+      "name": "win_total_votes",
+      "item_number": 20,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 928,
+      "byte_size": 11,
+      "display": {"label": "単勝票数合計", "width_type": "half", "char_count": 11}
+    },
+    {
+      "name": "place_total_votes",
+      "item_number": 21,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 939,
+      "byte_size": 11,
+      "display": {"label": "複勝票数合計", "width_type": "half", "char_count": 11}
+    },
+    {
+      "name": "bracket_quinella_total_votes",
+      "item_number": 22,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 950,
+      "byte_size": 11,
+      "display": {"label": "枠連票数合計", "width_type": "half", "char_count": 11}
+    }
+  ]
+}

@@ -1,0 +1,233 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # v1.0.0 などのタグでトリガー
+  workflow_dispatch:  # 手動実行も可能
+
+jobs:
+  build-cpp:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1
+      
+    - name: Build C++ server
+      run: |
+        cmake -B build -S . -A Win32
+        cmake --build build --config Release
+        
+    - name: Upload C++ artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: cpp-server
+        path: build/Release/JVLinkServer.exe
+
+  build-python-windows:
+    needs: build-cpp
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install uv
+      run: pip install uv
+      
+    - name: Download C++ artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: cpp-server
+        path: cpp-server/
+        
+    - name: Copy server executable to package
+      run: |
+        New-Item -ItemType Directory -Force -Path python/src/pyjvlink/lib
+        Copy-Item cpp-server/JVLinkServer.exe python/src/pyjvlink/lib/
+        
+    - name: Build Python package
+      run: |
+        cd python
+        uv sync
+        uv build --wheel
+
+    - name: Verify wheel tag and bundled executable
+      run: |
+        $script = @'
+        import glob
+        import os
+        import zipfile
+
+        wheels = glob.glob("python/dist/*.whl")
+        if len(wheels) != 1:
+            raise RuntimeError(f"Expected exactly 1 wheel, found {len(wheels)}")
+
+        wheel = wheels[0]
+        name = os.path.basename(wheel)
+        if "win_amd64" not in name:
+            raise RuntimeError(f"Wheel tag must be win_amd64: {name}")
+
+        required = "pyjvlink/lib/JVLinkServer.exe"
+        with zipfile.ZipFile(wheel) as zf:
+            names = set(zf.namelist())
+            if required not in names:
+                raise RuntimeError(f"Missing required file in wheel: {required}")
+
+        print(f"Validated wheel: {name}")
+        '@
+        python -c $script
+
+    - name: Check wheel metadata
+      run: |
+        pip install --upgrade twine
+        python -m twine check python/dist/*.whl
+
+    - name: Upload Windows Python distribution artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-distributions-windows
+        path: python/dist/*.whl
+
+  build-python-portable:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install uv
+      run: python -m pip install uv
+
+    - name: Build portable Python package
+      run: |
+        cd python
+        uv sync
+        uv build --wheel --sdist
+
+    - name: Verify portable wheel
+      run: |
+        python - << 'PY'
+        import glob
+        import os
+        import zipfile
+
+        wheels = glob.glob("python/dist/*.whl")
+        if len(wheels) != 1:
+            raise RuntimeError(f"Expected exactly 1 wheel, found {len(wheels)}")
+
+        wheel = wheels[0]
+        name = os.path.basename(wheel)
+        if "py3-none-any" not in name:
+            raise RuntimeError(f"Portable wheel must be py3-none-any: {name}")
+
+        forbidden = "pyjvlink/lib/JVLinkServer.exe"
+        with zipfile.ZipFile(wheel) as zf:
+            names = set(zf.namelist())
+            if forbidden in names:
+                raise RuntimeError(f"Portable wheel must not include: {forbidden}")
+
+        print(f"Validated portable wheel: {name}")
+        PY
+
+    - name: Check distribution metadata
+      run: |
+        python -m pip install --upgrade twine
+        python -m twine check python/dist/*
+
+    - name: Upload portable Python distribution artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-distributions-portable
+        path: python/dist/*
+
+  release:
+    needs: [build-cpp, build-python-windows, build-python-portable]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download C++ artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: cpp-server
+        path: cpp-server/
+        
+    - name: Download Windows Python distribution artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: python-distributions-windows
+        path: dist/
+
+    - name: Download portable Python distribution artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: python-distributions-portable
+        path: dist/
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.PYPI_TOKEN }}
+        packages-dir: dist/
+        skip-existing: true
+        
+    - name: Create Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        VERSION="${GITHUB_REF_NAME#v}"
+        cat << 'EOF' > release_notes.md
+        ## JVLinkServer ${{ github.ref_name }}
+
+        ### インストール
+
+        ```bash
+        pip install pyjvlink==VERSION_PLACEHOLDER
+        ```
+
+        Windows では配布 wheel に `JVLinkServer.exe` を同梱しています。
+        Linux などの portable wheel では実行ファイルを同梱しません。
+
+        ### 変更履歴
+
+        詳細は[CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/CHANGELOG.md)を参照してください。
+        EOF
+        sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" release_notes.md
+
+        if ! gh release view ${{ github.ref_name }} > /dev/null 2>&1; then
+          gh release create ${{ github.ref_name }} \
+            --title "JVLinkServer ${{ github.ref_name }}" \
+            --notes-file release_notes.md \
+            --latest
+        fi
+
+        gh release edit ${{ github.ref_name }} \
+          --title "JVLinkServer ${{ github.ref_name }}" \
+          --notes-file release_notes.md \
+          --latest
+
+        gh release upload ${{ github.ref_name }} \
+          cpp-server/JVLinkServer.exe \
+          dist/*.whl \
+          dist/*.tar.gz \
+          --clobber

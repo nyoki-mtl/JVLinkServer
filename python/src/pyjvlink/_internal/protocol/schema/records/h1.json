@@ -1,0 +1,508 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "H1",
+  "title": "票数1",
+  "record_length": 28955,
+  "key_fields": ["meet_year", "meet_date", "racecourse_code", "meet_round", "meet_day", "race_number"],
+  "common_fields_ref": "../_common_race_fields.json",
+  "fields": [
+    {
+      "name": "num_entries",
+      "item_number": 10,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 28,
+      "byte_size": 2,
+      "display": {"label": "登録頭数", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "num_starters",
+      "item_number": 11,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 30,
+      "byte_size": 2,
+      "display": {"label": "出走頭数", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "win_sales_flag",
+      "item_number": 12,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 32,
+      "byte_size": 1,
+      "display": {"label": "発売フラグ 単勝", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "place_sales_flag",
+      "item_number": 13,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 33,
+      "byte_size": 1,
+      "display": {"label": "発売フラグ 複勝", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "bracket_quinella_sales_flag",
+      "item_number": 14,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 34,
+      "byte_size": 1,
+      "display": {"label": "発売フラグ 枠連", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "quinella_sales_flag",
+      "item_number": 15,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 35,
+      "byte_size": 1,
+      "display": {"label": "発売フラグ 馬連", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "wide_sales_flag",
+      "item_number": 16,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 36,
+      "byte_size": 1,
+      "display": {"label": "発売フラグ ワイド", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "exacta_sales_flag",
+      "item_number": 17,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 37,
+      "byte_size": 1,
+      "display": {"label": "発売フラグ 馬単", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "trio_sales_flag",
+      "item_number": 18,
+      "wire_type": "string",
+      "semantic_type": "flag",
+      "byte_position": 38,
+      "byte_size": 1,
+      "display": {"label": "発売フラグ 3連複", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "place_payout_key",
+      "item_number": 19,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 39,
+      "byte_size": 1,
+      "display": {"label": "複勝着払キー", "width_type": "half", "char_count": 1}
+    },
+    {
+      "name": "refund_horse_numbers",
+      "item_number": 20,
+      "wire_type": "array",
+      "semantic_type": "array:str",
+      "byte_position": 40,
+      "byte_size": 28,
+      "display": {"label": "返還馬番情報"},
+      "array_info": {"element_size": 1, "count": 28}
+    },
+    {
+      "name": "refund_bracket_numbers",
+      "item_number": 21,
+      "wire_type": "array",
+      "semantic_type": "array:str",
+      "byte_position": 68,
+      "byte_size": 8,
+      "display": {"label": "返還枠番情報"},
+      "array_info": {"element_size": 1, "count": 8}
+    },
+    {
+      "name": "refund_same_bracket",
+      "item_number": 22,
+      "wire_type": "array",
+      "semantic_type": "array:str",
+      "byte_position": 76,
+      "byte_size": 8,
+      "display": {"label": "返還同枠情報"},
+      "array_info": {"element_size": 1, "count": 8}
+    },
+    {
+      "name": "win_votes",
+      "item_number": 23,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 84,
+      "byte_size": 420,
+      "display": {"label": "単勝票数"},
+      "array_info": {"element_size": 15, "count": 28},
+      "element_fields": [
+        {
+          "name": "horse_number",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 0,
+          "byte_size": 2,
+          "display": {"label": "馬番", "width_type": "half", "char_count": 2}
+        },
+        {
+          "name": "votes",
+          "wire_type": "string",
+          "semantic_type": "money_100yen",
+          "byte_offset": 2,
+          "byte_size": 11,
+          "display": {"label": "票数", "width_type": "half", "char_count": 11}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 13,
+          "byte_size": 2,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 2}
+        }
+      ]
+    },
+    {
+      "name": "place_votes",
+      "item_number": 24,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 504,
+      "byte_size": 420,
+      "display": {"label": "複勝票数"},
+      "array_info": {"element_size": 15, "count": 28},
+      "element_fields": [
+        {
+          "name": "horse_number",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 0,
+          "byte_size": 2,
+          "display": {"label": "馬番", "width_type": "half", "char_count": 2}
+        },
+        {
+          "name": "votes",
+          "wire_type": "string",
+          "semantic_type": "money_100yen",
+          "byte_offset": 2,
+          "byte_size": 11,
+          "display": {"label": "票数", "width_type": "half", "char_count": 11}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 13,
+          "byte_size": 2,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 2}
+        }
+      ]
+    },
+    {
+      "name": "bracket_quinella_votes",
+      "item_number": 25,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 924,
+      "byte_size": 540,
+      "display": {"label": "枠連票数"},
+      "array_info": {"element_size": 15, "count": 36},
+      "element_fields": [
+        {
+          "name": "combination",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 2,
+          "display": {"label": "組番", "width_type": "half", "char_count": 2}
+        },
+        {
+          "name": "votes",
+          "wire_type": "string",
+          "semantic_type": "money_100yen",
+          "byte_offset": 2,
+          "byte_size": 11,
+          "display": {"label": "票数", "width_type": "half", "char_count": 11}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 13,
+          "byte_size": 2,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 2}
+        }
+      ]
+    },
+    {
+      "name": "quinella_votes",
+      "item_number": 26,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 1464,
+      "byte_size": 2754,
+      "display": {"label": "馬連票数"},
+      "array_info": {"element_size": 18, "count": 153},
+      "element_fields": [
+        {
+          "name": "combination",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 4,
+          "display": {"label": "組番", "width_type": "half", "char_count": 4}
+        },
+        {
+          "name": "votes",
+          "wire_type": "string",
+          "semantic_type": "money_100yen",
+          "byte_offset": 4,
+          "byte_size": 11,
+          "display": {"label": "票数", "width_type": "half", "char_count": 11}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 15,
+          "byte_size": 3,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 3}
+        }
+      ]
+    },
+    {
+      "name": "wide_votes",
+      "item_number": 27,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 4218,
+      "byte_size": 2754,
+      "display": {"label": "ワイド票数"},
+      "array_info": {"element_size": 18, "count": 153},
+      "element_fields": [
+        {
+          "name": "combination",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 4,
+          "display": {"label": "組番", "width_type": "half", "char_count": 4}
+        },
+        {
+          "name": "votes",
+          "wire_type": "string",
+          "semantic_type": "money_100yen",
+          "byte_offset": 4,
+          "byte_size": 11,
+          "display": {"label": "票数", "width_type": "half", "char_count": 11}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 15,
+          "byte_size": 3,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 3}
+        }
+      ]
+    },
+    {
+      "name": "exacta_votes",
+      "item_number": 28,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 6972,
+      "byte_size": 5508,
+      "display": {"label": "馬単票数"},
+      "array_info": {"element_size": 18, "count": 306},
+      "element_fields": [
+        {
+          "name": "combination",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 4,
+          "display": {"label": "組番", "width_type": "half", "char_count": 4}
+        },
+        {
+          "name": "votes",
+          "wire_type": "string",
+          "semantic_type": "money_100yen",
+          "byte_offset": 4,
+          "byte_size": 11,
+          "display": {"label": "票数", "width_type": "half", "char_count": 11}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 15,
+          "byte_size": 3,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 3}
+        }
+      ]
+    },
+    {
+      "name": "trio_votes",
+      "item_number": 29,
+      "wire_type": "array",
+      "semantic_type": "array:object",
+      "byte_position": 12480,
+      "byte_size": 16320,
+      "display": {"label": "3連複票数"},
+      "array_info": {"element_size": 20, "count": 816},
+      "element_fields": [
+        {
+          "name": "combination",
+          "wire_type": "string",
+          "semantic_type": "str",
+          "byte_offset": 0,
+          "byte_size": 6,
+          "display": {"label": "組番", "width_type": "half", "char_count": 6}
+        },
+        {
+          "name": "votes",
+          "wire_type": "string",
+          "semantic_type": "money_100yen",
+          "byte_offset": 6,
+          "byte_size": 11,
+          "display": {"label": "票数", "width_type": "half", "char_count": 11}
+        },
+        {
+          "name": "popularity_rank",
+          "wire_type": "string",
+          "semantic_type": "int",
+          "byte_offset": 17,
+          "byte_size": 3,
+          "display": {"label": "人気順", "width_type": "half", "char_count": 3}
+        }
+      ]
+    },
+    {
+      "name": "win_total_votes",
+      "item_number": 30,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 28800,
+      "byte_size": 11,
+      "display": {"label": "単勝票数合計", "width_type": "half", "char_count": 11}
+    },
+    {
+      "name": "place_total_votes",
+      "item_number": 31,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 28811,
+      "byte_size": 11,
+      "display": {"label": "複勝票数合計", "width_type": "half", "char_count": 11}
+    },
+    {
+      "name": "bracket_quinella_total_votes",
+      "item_number": 32,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 28822,
+      "byte_size": 11,
+      "display": {"label": "枠連票数合計", "width_type": "half", "char_count": 11}
+    },
+    {
+      "name": "quinella_total_votes",
+      "item_number": 33,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 28833,
+      "byte_size": 11,
+      "display": {"label": "馬連票数合計", "width_type": "half", "char_count": 11}
+    },
+    {
+      "name": "wide_total_votes",
+      "item_number": 34,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 28844,
+      "byte_size": 11,
+      "display": {"label": "ワイド票数合計", "width_type": "half", "char_count": 11}
+    },
+    {
+      "name": "exacta_total_votes",
+      "item_number": 35,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 28855,
+      "byte_size": 11,
+      "display": {"label": "馬単票数合計", "width_type": "half", "char_count": 11}
+    },
+    {
+      "name": "trio_total_votes",
+      "item_number": 36,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 28866,
+      "byte_size": 11,
+      "display": {"label": "3連複票数合計", "width_type": "half", "char_count": 11}
+    },
+    {
+      "name": "win_refund_votes",
+      "item_number": 37,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 28877,
+      "byte_size": 11,
+      "display": {"label": "単勝返還票数合計", "width_type": "half", "char_count": 11}
+    },
+    {
+      "name": "place_refund_votes",
+      "item_number": 38,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 28888,
+      "byte_size": 11,
+      "display": {"label": "複勝返還票数合計", "width_type": "half", "char_count": 11}
+    },
+    {
+      "name": "bracket_quinella_refund_votes",
+      "item_number": 39,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 28899,
+      "byte_size": 11,
+      "display": {"label": "枠連返還票数合計", "width_type": "half", "char_count": 11}
+    },
+    {
+      "name": "quinella_refund_votes",
+      "item_number": 40,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 28910,
+      "byte_size": 11,
+      "display": {"label": "馬連返還票数合計", "width_type": "half", "char_count": 11}
+    },
+    {
+      "name": "wide_refund_votes",
+      "item_number": 41,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 28921,
+      "byte_size": 11,
+      "display": {"label": "ワイド返還票数合計", "width_type": "half", "char_count": 11}
+    },
+    {
+      "name": "exacta_refund_votes",
+      "item_number": 42,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 28932,
+      "byte_size": 11,
+      "display": {"label": "馬単返還票数合計", "width_type": "half", "char_count": 11}
+    },
+    {
+      "name": "trio_refund_votes",
+      "item_number": 43,
+      "wire_type": "string",
+      "semantic_type": "money_100yen",
+      "byte_position": 28943,
+      "byte_size": 11,
+      "display": {"label": "3連複返還票数合計", "width_type": "half", "char_count": 11}
+    }
+  ]
+}

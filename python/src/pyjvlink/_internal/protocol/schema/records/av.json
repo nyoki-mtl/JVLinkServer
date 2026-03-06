@@ -1,0 +1,48 @@
+{
+  "$schema": "../_meta.json",
+  "record_type": "AV",
+  "title": "出走取消・競走除外",
+  "record_length": 78,
+  "key_fields": ["meet_year", "meet_date", "racecourse_code", "meet_round", "meet_day", "race_number", "horse_number"],
+  "common_fields_ref": "../_common_race_fields.json",
+  "has_announcement_datetime": true,
+  "fields": [
+    {
+      "name": "announcement_datetime",
+      "item_number": 10,
+      "wire_type": "string",
+      "semantic_type": "datetime_mmddhhmm",
+      "byte_position": 28,
+      "byte_size": 8,
+      "display": {"label": "発表月日時分", "width_type": "half", "char_count": 8}
+    },
+    {
+      "name": "horse_number",
+      "item_number": 11,
+      "wire_type": "string",
+      "semantic_type": "int",
+      "byte_position": 36,
+      "byte_size": 2,
+      "is_key": true,
+      "display": {"label": "馬番", "width_type": "half", "char_count": 2}
+    },
+    {
+      "name": "horse_name",
+      "item_number": 12,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 38,
+      "byte_size": 36,
+      "display": {"label": "馬名", "width_type": "full", "char_count": 18}
+    },
+    {
+      "name": "exclusion_reason_code",
+      "item_number": 13,
+      "wire_type": "string",
+      "semantic_type": "str",
+      "byte_position": 74,
+      "byte_size": 3,
+      "display": {"label": "事由区分", "width_type": "half", "char_count": 3}
+    }
+  ]
+}
