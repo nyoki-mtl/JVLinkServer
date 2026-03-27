@@ -15,6 +15,14 @@ class JVServerError(JVLinkError):
         self.error_code = error_code
 
 
+class JVBusyError(JVServerError):
+    """The single JV-Link session is busy and the request can be retried."""
+
+    def __init__(self, message: str, error_code: int | None = None, retry_after: int | None = None):
+        super().__init__(message, error_code=error_code)
+        self.retry_after = retry_after
+
+
 class JVOpenError(JVServerError):
     """JVOpen error returned by JV-Link."""
 
@@ -71,6 +79,7 @@ class JVNoDataError(JVDataError):
 # Used by the transport layer to raise precise exceptions.
 _ERROR_CODE_MAP: dict[int, type[JVLinkError]] = {
     -1: JVNoDataError,
+    -202: JVBusyError,
     -111: JVInvalidDataSpecError,
     -112: JVInvalidParameterError,
     -113: JVInvalidFromTimeError,
@@ -93,10 +102,13 @@ def build_error_for_code(
     message: str,
     *,
     default_exc: type[JVLinkError] = JVOpenError,
+    retry_after: int | None = None,
 ) -> JVLinkError:
     """Build the appropriate exception instance for a JV-Link error code."""
     exc_cls = _ERROR_CODE_MAP.get(error_code, default_exc)
     try:
+        if exc_cls is JVBusyError:
+            return exc_cls(message, error_code=error_code, retry_after=retry_after)
         return exc_cls(message, error_code=error_code)  # type: ignore[call-arg]
     except TypeError:
         # Validation errors do not accept error_code in the constructor.
@@ -117,6 +129,7 @@ def raise_for_error_code(
 
 __all__ = [
     "JVAuthError",
+    "JVBusyError",
     "JVConnectionError",
     "JVDataError",
     "JVFileCorruptedError",

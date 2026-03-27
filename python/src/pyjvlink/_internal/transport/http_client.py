@@ -71,9 +71,22 @@ class HttpTransport:
             raise JVConnectionError("Client not started. Call start() first.")
         return self._client
 
-    def _parse_server_error(self, error: httpx.HTTPStatusError) -> tuple[str, int]:
+    @staticmethod
+    def _parse_retry_after(response: httpx.Response) -> int | None:
+        raw_retry_after = response.headers.get("Retry-After")
+        if raw_retry_after is None:
+            return None
+        try:
+            retry_after = int(raw_retry_after)
+        except ValueError:
+            logger.debug("Failed to parse Retry-After header: %s", raw_retry_after)
+            return None
+        return retry_after if retry_after >= 0 else None
+
+    def _parse_server_error(self, error: httpx.HTTPStatusError) -> tuple[str, int, int | None]:
         error_code = error.response.status_code
         error_message = error.response.text
+        retry_after = self._parse_retry_after(error.response)
         try:
             payload = cast(dict[str, Any], error.response.json())
             error_info = payload.get("error")
@@ -86,10 +99,21 @@ class HttpTransport:
                     error_code = parsed_code
         except (ValueError, KeyError, AttributeError):
             logger.debug("Failed to parse structured error from response body")
-        return error_message, error_code
+        return error_message, error_code, retry_after
 
-    def _raise_server_error(self, error_message: str, error_code: int, cause: Exception) -> NoReturn:
-        raise build_error_for_code(error_code, error_message, default_exc=JVServerError) from cause
+    def _raise_server_error(
+        self,
+        error_message: str,
+        error_code: int,
+        retry_after: int | None,
+        cause: Exception,
+    ) -> NoReturn:
+        raise build_error_for_code(
+            error_code,
+            error_message,
+            default_exc=JVServerError,
+            retry_after=retry_after,
+        ) from cause
 
     async def _request_json(
         self, method: str, endpoint: str, *, payload: dict[str, Any] | None = None
@@ -103,8 +127,8 @@ class HttpTransport:
                 raise JVDataError(f"Invalid JSON response format: expected object, got {type(parsed).__name__}.")
             return cast(dict[str, Any], parsed)
         except httpx.HTTPStatusError as e:
-            error_message, error_code = self._parse_server_error(e)
-            self._raise_server_error(error_message, error_code, e)
+            error_message, error_code, retry_after = self._parse_server_error(e)
+            self._raise_server_error(error_message, error_code, retry_after, e)
         except httpx.TimeoutException as e:
             raise JVTimeoutError(f"HTTP request timeout: {endpoint}") from e
         except httpx.ConnectError as e:
@@ -123,8 +147,8 @@ class HttpTransport:
             response.raise_for_status()
             return response
         except httpx.HTTPStatusError as e:
-            error_message, error_code = self._parse_server_error(e)
-            self._raise_server_error(error_message, error_code, e)
+            error_message, error_code, retry_after = self._parse_server_error(e)
+            self._raise_server_error(error_message, error_code, retry_after, e)
         except httpx.TimeoutException as e:
             raise JVTimeoutError(f"HTTP request timeout: {endpoint}") from e
         except httpx.ConnectError as e:
@@ -175,9 +199,10 @@ class HttpTransport:
                 finally:
                     response_closed = True
 
-        async def parse_http_status_error(error: httpx.HTTPStatusError) -> tuple[str, int]:
+        async def parse_http_status_error(error: httpx.HTTPStatusError) -> tuple[str, int, int | None]:
             error_message = f"HTTP communication error (status {error.response.status_code})"
             error_code = error.response.status_code
+            retry_after = self._parse_retry_after(error.response)
             try:
                 error_text = await error.response.aread()
                 decoded_error = error_text.decode("utf-8", errors="replace")
@@ -186,14 +211,14 @@ class HttpTransport:
                 try:
                     error_body = json.loads(error_text)
                 except json.JSONDecodeError:
-                    return error_message, error_code
+                    return error_message, error_code, retry_after
 
                 if not isinstance(error_body, dict):
-                    return error_message, error_code
+                    return error_message, error_code, retry_after
 
                 error_info = error_body.get("error")
                 if not isinstance(error_info, dict):
-                    return error_message, error_code
+                    return error_message, error_code, retry_after
 
                 parsed_message = error_info.get("message")
                 if isinstance(parsed_message, str) and parsed_message.strip():
@@ -203,7 +228,7 @@ class HttpTransport:
                     error_code = parsed_code
             except (httpx.StreamError, UnicodeDecodeError) as e:
                 logger.debug("Failed to read error response body: %s", e)
-            return error_message, error_code
+            return error_message, error_code, retry_after
 
         try:
             response = await response_context_manager.__aenter__()
@@ -212,11 +237,14 @@ class HttpTransport:
             try:
                 response.raise_for_status()
             except httpx.HTTPStatusError as e:
-                error_message, error_code = await parse_http_status_error(e)
+                error_message, error_code, retry_after = await parse_http_status_error(e)
                 await close_response()
-                if e.response.status_code >= 500:
-                    raise JVServerError(error_message, error_code=error_code) from e
-                raise build_error_for_code(error_code, error_message, default_exc=JVServerError) from e
+                raise build_error_for_code(
+                    error_code,
+                    error_message,
+                    default_exc=JVServerError,
+                    retry_after=retry_after,
+                ) from e
 
             line_iterator = response.aiter_lines()
 

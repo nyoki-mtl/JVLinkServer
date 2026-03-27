@@ -32,6 +32,8 @@ VERSION="$1"
 SOURCE_REF="${2:-develop/main}"
 PUBLIC_BASE="${3:-public/main}"
 EXPORT_BRANCH="export-public"
+PUBLIC_GIT_AUTHOR_NAME="${PUBLIC_GIT_AUTHOR_NAME:-nyoki-mtl}"
+PUBLIC_GIT_AUTHOR_EMAIL="${PUBLIC_GIT_AUTHOR_EMAIL:-charmer.popopo@gmail.com}"
 
 EXCLUDE_PATHS=(
   "AGENTS.md"
@@ -105,6 +107,10 @@ if git diff --cached --quiet; then
   exit 0
 fi
 
+GIT_AUTHOR_NAME="${PUBLIC_GIT_AUTHOR_NAME}" \
+GIT_AUTHOR_EMAIL="${PUBLIC_GIT_AUTHOR_EMAIL}" \
+GIT_COMMITTER_NAME="${PUBLIC_GIT_AUTHOR_NAME}" \
+GIT_COMMITTER_EMAIL="${PUBLIC_GIT_AUTHOR_EMAIL}" \
 git commit -m "Release ${VERSION}"
 
 cat <<EOF

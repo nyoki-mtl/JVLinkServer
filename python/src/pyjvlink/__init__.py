@@ -2,12 +2,13 @@
 
 import logging
 
-__version__ = "0.8.0"
+__version__ = "0.8.1"
 __author__ = "Hiroki Taniai"
 
 from pyjvlink.api import Client
 from pyjvlink.errors import (
     JVAuthError,
+    JVBusyError,
     JVConnectionError,
     JVDataError,
     JVFileCorruptedError,
@@ -31,6 +32,7 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 __all__ = [
     "Client",
     "JVAuthError",
+    "JVBusyError",
     "JVConnectionError",
     "JVDataError",
     "JVDataSpec",

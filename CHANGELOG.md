@@ -3,6 +3,17 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [セマンティックバージョニング](https://semver.org/lang/ja/) に準拠しています。
 
+## [0.8.1] - 2026-03-27
+
+### 修正
+- `JV-Link session is busy` による HTTP 503 を generic error ログから分離し、`path` / `operation` / `remote_addr` を含む `warning` ログとして記録するよう変更。
+- busy 503 レスポンスに `Retry-After`、`X-JVLink-Busy`、`X-JVLink-Operation` ヘッダーを追加し、既存の 503 status と error body 互換性を維持したまま retry hint を機械可読化。
+- `/health` に busy の累積回数と直近発生時刻を追加し、single-session 競合の観測性を改善。
+- `pyjvlink` で `-202` を `JVBusyError` として扱い、`Retry-After` を例外に保持できるようにした。
+
+### テスト
+- busy 503 の header / error mapping / stream 経路をカバーする Python テストを追加。
+
 ## [0.8.0] - 2026-03-06
 
 ### 追加

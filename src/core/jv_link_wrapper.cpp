@@ -32,6 +32,7 @@ static const int JV_DOWNLOAD_POLL_INTERVAL_MS = 100;       // ダウンロード
 static const int JV_DOWNLOAD_BASE_TIMEOUT_ITERATIONS = 3000;    // 基本タイムアウト（5分）
 static const int JV_DOWNLOAD_PER_FILE_ITERATIONS = 60;     // ファイル1件あたり追加猶予（6秒）
 static const int JV_DOWNLOAD_PROGRESS_LOG_INTERVAL = 100;  // 進捗ログ出力間隔（10秒ごと）
+static const long long JV_STREAM_PROGRESS_LOG_INTERVAL = 10000;  // ストリーム進捗ログ出力間隔
 static const LCID JV_JAPANESE_LCID = MAKELCID(MAKELANGID(LANG_JAPANESE, SUBLANG_DEFAULT), SORT_DEFAULT);
 
 // JV-Link COMコンポーネントのCLSID
@@ -157,7 +158,8 @@ void JVLinkWrapper::shutdownOnComThread() {
 void JVLinkWrapper::queryStored(const std::string& dataspec, const std::string& fromdate, long option, int max_records,
                                 const std::function<void(const std::string&)>& record_callback,
                                 const std::function<void(const JVQueryResult&)>& meta_callback,
-                                const std::vector<std::string>& filter_record_types) {
+                                const std::vector<std::string>& filter_record_types,
+                                const std::function<bool()>& cancel_requested) {
   // JVGetsを使用した実装（高性能、デフォルト）
   /**
    * @brief JVGetsを使用してJV-Linkから蓄積データをストリーミングします。
@@ -172,6 +174,7 @@ void JVLinkWrapper::queryStored(const std::string& dataspec, const std::string& 
    * 5. JVCloseでクリーンアップします。
    */
   JVQueryResult result = {};
+  auto should_cancel = [&cancel_requested]() { return cancel_requested && cancel_requested(); };
 
   // 初期化状態をチェック
   if (!is_initialized_) {
@@ -197,9 +200,20 @@ void JVLinkWrapper::queryStored(const std::string& dataspec, const std::string& 
         return performJVOpen(dataspec, from_time_to_use, option, read_count, download_count, last_timestamp);
       });
 
+  spdlog::info(
+      "queryStored JVOpen returned for dataspec: {}, option: {}, fromtime: {}, openResult: {}, read_count: {}, "
+      "download_count: {}, last_timestamp: {}",
+      dataspec, option, from_time_to_use, openResult, read_count, download_count, last_timestamp);
+
+  if (should_cancel()) {
+    spdlog::debug("queryStored cancellation requested after JVOpen for dataspec: {}", dataspec);
+    throw JVOperationCanceledException("Stored stream canceled after JVOpen");
+  }
+
   if (openResult < 0 && openResult != jvlink::error::JV_ERROR_NO_DATA) {
     result.error_code = openResult;
     result.error_message = "JV-Link API error: " + jvlink::error::getErrorMessage(openResult);
+    spdlog::warn("queryStored invoking meta_callback with error for dataspec: {} (code: {})", dataspec, openResult);
     meta_callback(result);
     return;
   }
@@ -210,10 +224,17 @@ void JVLinkWrapper::queryStored(const std::string& dataspec, const std::string& 
     bool downloadResult = m_comWorker->invokeTask<bool>(
         [this, download_count, &download_status_code]() { return waitForDownload(download_count, &download_status_code); });
 
+    if (should_cancel()) {
+      spdlog::debug("queryStored cancellation requested after download wait for dataspec: {}", dataspec);
+      throw JVOperationCanceledException("Stored stream canceled during download wait");
+    }
+
     if (!downloadResult) {
       result.error_code = static_cast<int>(
           (download_status_code < 0) ? download_status_code : jvlink::error::JV_ERROR_DOWNLOAD_FAILED);
       result.error_message = "JVStatus failed: " + jvlink::error::getErrorMessage(result.error_code);
+      spdlog::warn("queryStored invoking meta_callback after JVStatus failure for dataspec: {} (status: {})", dataspec,
+                   download_status_code);
       meta_callback(result);
       return;  // JVSessionGuardがJVCloseを呼ぶ
     }
@@ -224,9 +245,16 @@ void JVLinkWrapper::queryStored(const std::string& dataspec, const std::string& 
   result.download_count = download_count;
   result.last_file_timestamp = last_timestamp;
   result.success = true;
+  if (should_cancel()) {
+    spdlog::debug("queryStored cancellation requested before success meta_callback for dataspec: {}", dataspec);
+    throw JVOperationCanceledException("Stored stream canceled before meta callback");
+  }
+  spdlog::debug("queryStored invoking success meta_callback for dataspec: {}", dataspec);
   meta_callback(result);
+  spdlog::debug("queryStored success meta_callback returned for dataspec: {}", dataspec);
 
   // レコードを読み込んでストリーミング
+  long long total_streamed_records = 0;
   if (read_count > 0) {
     // max_records が正の場合のみ上限を適用。指定なし(<=0)はEOFまで全件読む。
     long long effective_max_records =
@@ -247,6 +275,12 @@ void JVLinkWrapper::queryStored(const std::string& dataspec, const std::string& 
     const int max_retries = 10000;  // 無限ループ防止のための最大リトライ回数
 
     while (actual_records < effective_max_records && retry_count < max_retries) {
+      if (should_cancel()) {
+        spdlog::debug("queryStored cancellation requested during JVGets loop for dataspec: {} after {} records",
+                      dataspec, actual_records);
+        throw JVOperationCanceledException("Stored stream canceled during JVGets loop");
+      }
+
       BYTE* buffer = nullptr;
       long size = 0;
       long ret = m_comWorker->invokeTask<long>(
@@ -254,6 +288,12 @@ void JVLinkWrapper::queryStored(const std::string& dataspec, const std::string& 
 
       // unique_ptrで自動的にメモリ管理
       std::unique_ptr<BYTE[]> buffer_ptr(buffer);
+
+      if (should_cancel()) {
+        spdlog::debug("queryStored cancellation requested after JVGets for dataspec: {} (ret: {}, records: {})",
+                      dataspec, ret, actual_records);
+        throw JVOperationCanceledException("Stored stream canceled after JVGets call");
+      }
 
       if (ret > 0 && buffer != nullptr) {
         // レコードの読み取りに成功
@@ -287,10 +327,22 @@ void JVLinkWrapper::queryStored(const std::string& dataspec, const std::string& 
         actual_records++;
         spdlog::trace("Read record {}/{} with JVGets - size: {} bytes", static_cast<long long>(actual_records),
                       static_cast<long long>(effective_max_records), size);
+        if (actual_records == 1) {
+          spdlog::debug("queryStored first JVGets record ready for dataspec: {} (filename: {}, size: {})", dataspec,
+                        filename, size);
+        } else if (actual_records % JV_STREAM_PROGRESS_LOG_INTERVAL == 0) {
+          spdlog::debug("queryStored JVGets progress for dataspec: {} - {} records read (current file: {})", dataspec,
+                        static_cast<long long>(actual_records), filename);
+        }
 
         // JVGetsから返されたデータをコールバックに渡す
         // データはShift_JISエンコーディングで、RecordParserが変換を行う
         record_callback(std::string(reinterpret_cast<char*>(buffer), size));
+        if (should_cancel()) {
+          spdlog::debug("queryStored cancellation requested after record callback for dataspec: {} (records: {})",
+                        dataspec, actual_records);
+          throw JVOperationCanceledException("Stored stream canceled after record callback");
+        }
       } else if (ret > 0 && buffer == nullptr) {
         // JVGetsが成功を返したがデータがNULLの場合
         spdlog::error("jvGets returned success ({}) but buffer is NULL - retrying", ret);
@@ -335,7 +387,12 @@ void JVLinkWrapper::queryStored(const std::string& dataspec, const std::string& 
     if (actual_records >= effective_max_records) {
       spdlog::info("Reached max_records limit: {}", static_cast<long long>(effective_max_records));
     }
+
+    total_streamed_records = actual_records;
   }
+
+  spdlog::info("queryStored finished for dataspec: {} (records_read={}, read_count={}, download_count={})", dataspec,
+               total_streamed_records, read_count, download_count);
 
   // JVSessionGuardのデストラクタで自動的にJVCloseが呼ばれる
 }

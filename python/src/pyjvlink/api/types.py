@@ -45,11 +45,21 @@ class HealthComponentsInfo(TypedDict, total=False):
     jvlink: HealthComponentInfo
 
 
+class HealthBusyMetricsInfo(TypedDict, total=False):
+    count: int
+    last_timestamp: int | None
+
+
+class HealthMetricsInfo(TypedDict, total=False):
+    busy: HealthBusyMetricsInfo
+
+
 class HealthResponse(TypedDict, total=False):
     status: str
     timestamp: int | str
     service: HealthServiceInfo
     components: HealthComponentsInfo
+    metrics: HealthMetricsInfo
     error: str
 
 

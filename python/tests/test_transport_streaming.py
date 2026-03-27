@@ -12,7 +12,14 @@ import pytest
 
 from pyjvlink._internal.transport import HttpTransport
 from pyjvlink._internal.transport.stream import wire_record_envelopes
-from pyjvlink.errors import JVConnectionError, JVDataError, JVInvalidKeyError, JVServerError, JVTimeoutError
+from pyjvlink.errors import (
+    JVBusyError,
+    JVConnectionError,
+    JVDataError,
+    JVInvalidKeyError,
+    JVServerError,
+    JVTimeoutError,
+)
 from pyjvlink.types import JVServerConfig
 
 
@@ -135,11 +142,12 @@ class _ClosableAsyncIterator:
 
 
 class _FakeHTTPErrorResponse:
-    def __init__(self, status_code: int, body: Any) -> None:
+    def __init__(self, status_code: int, body: Any, headers: dict[str, str] | None = None) -> None:
         self.status_code = status_code
         self._response = httpx.Response(
             status_code,
             json=body,
+            headers=headers,
             request=httpx.Request("POST", "http://example.local/query"),
         )
 
@@ -178,6 +186,27 @@ async def test_fetch_stream_http_status_reads_body_before_close() -> None:
 
     assert stream_context.closed is True
     assert exc_info.value.error_code == -201
+
+
+@pytest.mark.asyncio
+async def test_fetch_stream_busy_503_maps_to_busy_error_with_retry_after() -> None:
+    error_body = {"error": {"message": "JV-Link session is busy", "code": -202}}
+    response = _FakeHTTPErrorResponse(
+        status_code=503,
+        body=error_body,
+        headers={"Retry-After": "1", "X-JVLink-Busy": "1"},
+    )
+    stream_context = _FakeStreamContext(response)
+
+    transport = HttpTransport(JVServerConfig())
+    transport._client = _FakeAsyncClient(stream_context)  # type: ignore[assignment]
+
+    with pytest.raises(JVBusyError, match="JV-Link session is busy") as exc_info:
+        await transport._fetch_and_parse_stream("/query/stored", payload={})
+
+    assert stream_context.closed is True
+    assert exc_info.value.error_code == -202
+    assert exc_info.value.retry_after == 1
 
 
 @pytest.mark.asyncio
@@ -354,6 +383,24 @@ async def test_request_json_maps_network_error_to_connection_error() -> None:
 
     with pytest.raises(JVConnectionError, match="HTTP network error"):
         await transport.get_health()
+
+
+@pytest.mark.asyncio
+async def test_request_json_busy_503_maps_to_busy_error_with_retry_after() -> None:
+    response = httpx.Response(
+        503,
+        json={"error": {"message": "JV-Link session is busy", "code": -202}},
+        headers={"Retry-After": "1", "X-JVLink-Busy": "1"},
+        request=httpx.Request("GET", "http://example.local/health"),
+    )
+    transport = HttpTransport(JVServerConfig())
+    transport._client = _FakeRequestClient(request_response=response)  # type: ignore[assignment]
+
+    with pytest.raises(JVBusyError, match="JV-Link session is busy") as exc_info:
+        await transport.get_health()
+
+    assert exc_info.value.error_code == -202
+    assert exc_info.value.retry_after == 1
 
 
 @pytest.mark.asyncio

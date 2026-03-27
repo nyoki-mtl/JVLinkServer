@@ -15,15 +15,15 @@ inject_bundled_executable_into_wheel = _MODULE.inject_bundled_executable_into_wh
 
 
 def test_inject_bundled_executable_into_wheel_updates_record(tmp_path: Path) -> None:
-    wheel_path = tmp_path / "pyjvlink-0.8.0-py3-none-win_amd64.whl"
+    wheel_path = tmp_path / "pyjvlink-0.8.1-py3-none-win_amd64.whl"
     bundled_exe_path = tmp_path / "JVLinkServer.exe"
     bundled_exe_path.write_bytes(b"fake-exe")
 
     with zipfile.ZipFile(wheel_path, "w", compression=zipfile.ZIP_DEFLATED) as wheel:
-        wheel.writestr("pyjvlink/__init__.py", "__version__ = '0.8.0'\n")
+        wheel.writestr("pyjvlink/__init__.py", "__version__ = '0.8.1'\n")
         wheel.writestr(
-            "pyjvlink-0.8.0.dist-info/RECORD",
-            "pyjvlink/__init__.py,,\npyjvlink-0.8.0.dist-info/RECORD,,\n",
+            "pyjvlink-0.8.1.dist-info/RECORD",
+            "pyjvlink/__init__.py,,\npyjvlink-0.8.1.dist-info/RECORD,,\n",
         )
 
     inject_bundled_executable_into_wheel(wheel_path, bundled_exe_path)
@@ -31,7 +31,7 @@ def test_inject_bundled_executable_into_wheel_updates_record(tmp_path: Path) -> 
     with zipfile.ZipFile(wheel_path) as wheel:
         assert wheel.read("pyjvlink/lib/JVLinkServer.exe") == b"fake-exe"
 
-        rows = list(csv.reader(wheel.read("pyjvlink-0.8.0.dist-info/RECORD").decode("utf-8").splitlines()))
+        rows = list(csv.reader(wheel.read("pyjvlink-0.8.1.dist-info/RECORD").decode("utf-8").splitlines()))
         record_map = {row[0]: row[1:] for row in rows}
 
     assert "pyjvlink/lib/JVLinkServer.exe" in record_map

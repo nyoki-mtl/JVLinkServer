@@ -32,6 +32,15 @@ using json = nlohmann::json;
 
 namespace {
 
+constexpr const char* kBusyHeaderName = "X-JVLink-Busy";
+constexpr const char* kBusyOperationHeaderName = "X-JVLink-Operation";
+constexpr const char* kRetryAfterHeaderName = "Retry-After";
+constexpr int kBusyRetryAfterSec = 1;
+
+int64_t currentUnixTimestampSec() {
+  return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
 std::string resolveRecordTypeForOutput(const ParsedRecord& record) {
   const std::string mapped = ::recordTypeToString(record.type);
   if (mapped != "UNKNOWN") {
@@ -167,6 +176,10 @@ void initializeLogging(const std::string& log_level = "info") {
  */
 class JVLinkHTTPServer {
  private:
+  static constexpr int kDefaultSocketTimeoutSec = 65;
+  static constexpr int kDefaultStreamHeartbeatSec = 30;
+  static constexpr long long kStreamProgressLogInterval = 10000;
+
   std::unique_ptr<httplib::Server> server_;
   std::unique_ptr<JVLinkWrapper> jvlink_wrapper_;
   std::unique_ptr<jvlink::OpenAPIHandler> openapi_handler_;
@@ -185,6 +198,8 @@ class JVLinkHTTPServer {
   std::mutex event_queue_mutex_;
   std::condition_variable event_cv_;
   std::mutex jvlink_operation_mutex_;
+  std::atomic<uint64_t> busy_rejection_count_{0};
+  std::atomic<int64_t> last_busy_timestamp_{0};
 
  public:
   /**
@@ -197,6 +212,8 @@ class JVLinkHTTPServer {
    */
   explicit JVLinkHTTPServer(int port, std::string sid) : port_(port), sid_(std::move(sid)), running_(false) {
     server_ = std::make_unique<httplib::Server>();
+    // NDJSON/SSE の小さなチャンクを即時送信しやすくする。
+    server_->set_tcp_nodelay(true);
     jvlink_wrapper_ = std::make_unique<JVLinkWrapper>();
     openapi_handler_ = std::make_unique<jvlink::OpenAPIHandler>("127.0.0.1", port_);
 
@@ -295,20 +312,47 @@ class JVLinkHTTPServer {
   bool isRunning() const { return running_; }
 
  private:
-  void setBusyResponse(httplib::Response& res, const std::string& operation) {
+  void setBusyResponse(const httplib::Request& req, httplib::Response& res, const std::string& operation) {
+    const int64_t busy_timestamp = currentUnixTimestampSec();
+    busy_rejection_count_.fetch_add(1, std::memory_order_relaxed);
+    last_busy_timestamp_.store(busy_timestamp, std::memory_order_relaxed);
+
+    spdlog::warn("busy_503 path={} operation={} remote_addr={}", req.path, operation, req.remote_addr);
+
     res.status = 503;
+    res.set_header(kRetryAfterHeaderName, std::to_string(kBusyRetryAfterSec));
+    res.set_header(kBusyHeaderName, "1");
+    res.set_header(kBusyOperationHeaderName, operation);
     json error_response = {{"error", {{"code", -202}, {"message", "JV-Link session is busy"}}},
                            {"operation", operation}};
     res.set_content(error_response.dump(), "application/json; charset=utf-8");
   }
 
-  bool tryBeginOperation(std::unique_lock<std::mutex>& op_lock, httplib::Response& res, const std::string& operation) {
+  bool tryBeginOperation(std::unique_lock<std::mutex>& op_lock, const httplib::Request& req, httplib::Response& res,
+                         const std::string& operation) {
     op_lock = std::unique_lock<std::mutex>(jvlink_operation_mutex_, std::try_to_lock);
     if (op_lock.owns_lock()) {
       return true;
     }
-    setBusyResponse(res, operation);
+    setBusyResponse(req, res, operation);
     return false;
+  }
+
+  static int getPositiveEnvInt(const char* name, int def) {
+    const char* v = std::getenv(name);
+    if (!v) return def;
+
+    int parsed = std::atoi(v);
+    return parsed > 0 ? parsed : def;
+  }
+
+  static int getStreamHeartbeatSec() {
+    const char* v = std::getenv("JVLINK_SERVER_STREAM_HEARTBEAT_SEC");
+    if (!v) return kDefaultStreamHeartbeatSec;
+
+    int parsed = std::atoi(v);
+    if (parsed == 0) return 0;
+    return parsed > 0 ? parsed : kDefaultStreamHeartbeatSec;
   }
 
   /**
@@ -319,14 +363,8 @@ class JVLinkHTTPServer {
    */
   void setupRoutes() {
     // ストリーミング対応のためタイムアウトを設定（環境変数で調整可能）
-    auto get_env_int = [](const char* name, int def) {
-      const char* v = std::getenv(name);
-      if (!v) return def;
-      int parsed = std::atoi(v);
-      return parsed > 0 ? parsed : def;
-    };
-    int read_to_sec = get_env_int("JVLINK_SERVER_READ_TIMEOUT", 65);
-    int write_to_sec = get_env_int("JVLINK_SERVER_WRITE_TIMEOUT", 65);
+    int read_to_sec = getPositiveEnvInt("JVLINK_SERVER_READ_TIMEOUT", kDefaultSocketTimeoutSec);
+    int write_to_sec = getPositiveEnvInt("JVLINK_SERVER_WRITE_TIMEOUT", kDefaultSocketTimeoutSec);
     server_->set_read_timeout(read_to_sec, 0);
     server_->set_write_timeout(write_to_sec, 0);
 
@@ -432,6 +470,10 @@ class JVLinkHTTPServer {
    */
   void setupErrorHandlers() {
     server_->set_error_handler([](const httplib::Request& req, httplib::Response& res) {
+      if (res.status == 503 && res.get_header_value(kBusyHeaderName) == "1") {
+        return;
+      }
+
       spdlog::error("HTTP Error: {} for {} from {}", res.status, req.path, req.remote_addr);
 
       // ハンドラーがすでに詳細なエラー本文を設定している場合は上書きしない
@@ -494,9 +536,7 @@ class JVLinkHTTPServer {
 
       json health_response = {
           {"status", "healthy"},
-          {"timestamp",
-           std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
-               .count()},
+          {"timestamp", currentUnixTimestampSec()},
           {"service",
            {{"name", "JVLinkServer"},
             {"version", jvlink::server::getApiVersion()},
@@ -506,7 +546,14 @@ class JVLinkHTTPServer {
           {"components",
            {{"http_server", {{"status", "healthy"}, {"port", port_}}},
             {"jvlink",
-             {{"status", jvlink_initialized ? "healthy" : "unhealthy"}, {"initialized", jvlink_initialized}}}}}};
+             {{"status", jvlink_initialized ? "healthy" : "unhealthy"}, {"initialized", jvlink_initialized}}}}},
+          {"metrics",
+           {{"busy",
+             {{"count", busy_rejection_count_.load(std::memory_order_relaxed)},
+              {"last_timestamp",
+               last_busy_timestamp_.load(std::memory_order_relaxed) > 0
+                   ? json(last_busy_timestamp_.load(std::memory_order_relaxed))
+                   : json(nullptr)}}}}}};
 
       res.set_content(health_response.dump(), "application/json; charset=utf-8");
     } catch (const std::exception& e) {
@@ -626,9 +673,16 @@ class JVLinkHTTPServer {
         return;
       }
 
+      if (option == 3) {
+        spdlog::warn(
+            "query/stored received option=3 for data_spec: {}. JV-Link setup dialogs may block NDJSON body output "
+            "until the user responds. Prefer option=4 for automated clients.",
+            data_spec);
+      }
+
       auto session_lock = std::make_shared<std::unique_lock<std::mutex>>(jvlink_operation_mutex_, std::try_to_lock);
       if (!session_lock->owns_lock()) {
-        setBusyResponse(res, "query_stored");
+        setBusyResponse(req, res, "query_stored");
         return;
       }
 
@@ -650,9 +704,24 @@ class JVLinkHTTPServer {
             if (offset == 0) {
               // 初回呼び出し時にストリーミング処理を開始
 
+              // カスタム例外クラス（クライアント切断用）
+              class ClientDisconnectedException : public std::exception {
+                const char* what() const noexcept override { return "Client disconnected during streaming"; }
+              };
+
               // メタデータコールバック: ヘッダー情報を送信
               std::mutex sink_mutex;
               std::atomic<bool> streaming_active{true};
+              std::atomic<bool> client_disconnected{false};
+              bool meta_line_sent = false;
+              long long streamed_records = 0;
+
+              auto note_client_disconnected = [&](const std::string& reason) {
+                bool expected = false;
+                if (client_disconnected.compare_exchange_strong(expected, true)) {
+                  spdlog::info("Detected stored-stream client disconnect for data_spec: {} ({})", data_spec, reason);
+                }
+              };
 
               auto safe_write = [&](const char* data, size_t len) {
                 std::lock_guard<std::mutex> lock(sink_mutex);
@@ -669,20 +738,27 @@ class JVLinkHTTPServer {
                   meta_json["error"] = {{"message", meta_result.error_message}, {"code", meta_result.error_code}};
                 }
                 std::string meta_str = meta_json.dump();
-                safe_write(meta_str.c_str(), meta_str.length());
-                safe_write("\n", 1);
-              };
-
-              // カスタム例外クラス（クライアント切断用）
-              class ClientDisconnectedException : public std::exception {
-                const char* what() const noexcept override { return "Client disconnected during streaming"; }
+                spdlog::debug(
+                    "Streaming meta ready for data_spec: {} (success={}, read_count={}, download_count={}, "
+                    "last_file_timestamp={})",
+                    data_spec, meta_result.success, meta_result.read_count, meta_result.download_count,
+                    meta_result.last_file_timestamp);
+                bool write_success = safe_write(meta_str.c_str(), meta_str.length()) && safe_write("\n", 1);
+                if (!write_success) {
+                  note_client_disconnected("meta write failed");
+                  spdlog::info("Client disconnected while writing meta line for data_spec: {}", data_spec);
+                  throw ClientDisconnectedException();
+                }
+                meta_line_sent = true;
+                spdlog::debug("Streaming meta line written for data_spec: {}", data_spec);
               };
 
               // レコードコールバック: 各レコードをストリーミング
               auto record_callback = [&](const std::string& record_str) {
                 // クライアントの接続状態をチェック
                 if (!sink.is_writable()) {
-                  spdlog::warn("Client disconnected during streaming for data_spec: {}", data_spec);
+                  note_client_disconnected("sink became non-writable before record write");
+                  spdlog::info("Client disconnected during streaming for data_spec: {}", data_spec);
                   throw ClientDisconnectedException();  // 例外をスローしてループを中断
                 }
 
@@ -691,16 +767,29 @@ class JVLinkHTTPServer {
                   auto parsed_record = RecordParser::parseRecord(record_str);
                   if (parsed_record) {
                     json record_json;
-                    record_json["type"] = resolveRecordTypeForOutput(*parsed_record);
+                    const std::string output_record_type = resolveRecordTypeForOutput(*parsed_record);
+                    record_json["type"] = output_record_type;
                     record_json["data"] = parsed_record->structured_data;
                     std::string record_json_str = record_json.dump();
 
                     bool write_success = safe_write(record_json_str.c_str(), record_json_str.length());
-                    if (write_success) {
-                      safe_write("\n", 1);
-                    } else {
-                      spdlog::warn("Failed to write record to client for data_spec: {}", data_spec);
+                    if (!write_success || !safe_write("\n", 1)) {
+                      note_client_disconnected("record write failed");
+                      spdlog::info(
+                          "Client closed stream while writing record {} for data_spec: {} (record_type: {}, "
+                          "meta_line_sent={})",
+                          streamed_records + 1, data_spec, output_record_type, meta_line_sent);
                       throw ClientDisconnectedException();
+                    }
+
+                    streamed_records++;
+                    if (streamed_records == 1) {
+                      spdlog::debug(
+                          "First stream record written for data_spec: {} (record_type: {}, payload_bytes: {})",
+                          data_spec, output_record_type, record_json_str.size());
+                    } else if (streamed_records % kStreamProgressLogInterval == 0) {
+                      spdlog::info("Streaming progress for data_spec: {} - {} records written (latest type: {})",
+                                   data_spec, streamed_records, output_record_type);
                     }
                   }
                 } catch (const ClientDisconnectedException&) {
@@ -712,11 +801,7 @@ class JVLinkHTTPServer {
               };
 
               // ハートビート（空行）を定期送信してクライアントのread timeoutを跨ぐ
-              int heartbeat_sec = 0;
-              if (const char* hb = std::getenv("JVLINK_SERVER_STREAM_HEARTBEAT_SEC")) {
-                int v = std::atoi(hb);
-                if (v > 0) heartbeat_sec = v;
-              }
+              int heartbeat_sec = getStreamHeartbeatSec();
               std::thread heartbeat_thread;
               if (heartbeat_sec > 0) {
                 heartbeat_thread = std::thread([&]() {
@@ -726,8 +811,14 @@ class JVLinkHTTPServer {
                       std::this_thread::sleep_for(std::chrono::seconds(1));
                     }
                     if (!streaming_active.load()) break;
-                    if (!sink.is_writable()) break;
-                    if (!safe_write("\n", 1)) break;  // 空行
+                    if (!sink.is_writable()) {
+                      note_client_disconnected("heartbeat found non-writable sink");
+                      break;
+                    }
+                    if (!safe_write("\n", 1)) {
+                      note_client_disconnected("heartbeat write failed");
+                      break;  // 空行
+                    }
                   }
                   spdlog::debug("Streaming heartbeat stopped");
                 });
@@ -738,15 +829,27 @@ class JVLinkHTTPServer {
                 spdlog::debug("Using JVGets for better performance");
                 // クエリ実行（max_records と record_types を反映）
                 jvlink_wrapper_->queryStored(data_spec, from_date, option, max_records_req, record_callback,
-                                             meta_callback, filter_record_types);
+                                             meta_callback, filter_record_types,
+                                             [&]() { return client_disconnected.load(); });
+                spdlog::debug(
+                    "queryStored returned for data_spec: {} (meta_line_sent={}, streamed_records={}, option={}, "
+                    "client_disconnected={})",
+                    data_spec, meta_line_sent, streamed_records, option, client_disconnected.load());
                 streaming_active.store(false);
                 if (heartbeat_thread.joinable()) heartbeat_thread.join();
               } catch (const ClientDisconnectedException&) {
                 // クライアント切断は正常な終了として扱う
                 spdlog::info(
                     "Streaming terminated due to client disconnection for data_spec: {}. JVClose will be called "
-                    "automatically by RAII guard.",
-                    data_spec);
+                    "automatically by RAII guard. meta_line_sent={}, streamed_records={}",
+                    data_spec, meta_line_sent, streamed_records);
+                streaming_active.store(false);
+                if (heartbeat_thread.joinable()) heartbeat_thread.join();
+              } catch (const JVOperationCanceledException& e) {
+                spdlog::info(
+                    "Streaming canceled for data_spec: {} after client disconnect or shutdown signal: {} "
+                    "(meta_line_sent={}, streamed_records={})",
+                    data_spec, e.what(), meta_line_sent, streamed_records);
                 streaming_active.store(false);
                 if (heartbeat_thread.joinable()) heartbeat_thread.join();
               } catch (const JVStreamReadException& e) {
@@ -766,6 +869,7 @@ class JVLinkHTTPServer {
             }
 
             // ストリーミング終了を通知
+            spdlog::debug("Calling sink.done() for data_spec: {}", data_spec);
             sink.done();
             return true;
           });
@@ -809,7 +913,7 @@ class JVLinkHTTPServer {
     try {
       spdlog::info("Received /files/delete request from {}", req.remote_addr);
       std::unique_lock<std::mutex> op_lock;
-      if (!tryBeginOperation(op_lock, res, "files_delete")) {
+      if (!tryBeginOperation(op_lock, req, res, "files_delete")) {
         return;
       }
 
@@ -887,7 +991,7 @@ class JVLinkHTTPServer {
     try {
       spdlog::info("Received /uniform/file request from {}", req.remote_addr);
       std::unique_lock<std::mutex> op_lock;
-      if (!tryBeginOperation(op_lock, res, "uniform_file")) {
+      if (!tryBeginOperation(op_lock, req, res, "uniform_file")) {
         return;
       }
 
@@ -981,7 +1085,7 @@ class JVLinkHTTPServer {
     try {
       spdlog::info("Received /uniform/image request from {}", req.remote_addr);
       std::unique_lock<std::mutex> op_lock;
-      if (!tryBeginOperation(op_lock, res, "uniform_image")) {
+      if (!tryBeginOperation(op_lock, req, res, "uniform_image")) {
         return;
       }
 
@@ -1077,7 +1181,7 @@ class JVLinkHTTPServer {
     try {
       spdlog::info("Received /course/file request from {}", req.remote_addr);
       std::unique_lock<std::mutex> op_lock;
-      if (!tryBeginOperation(op_lock, res, "course_file")) {
+      if (!tryBeginOperation(op_lock, req, res, "course_file")) {
         return;
       }
 
@@ -1173,7 +1277,7 @@ class JVLinkHTTPServer {
     try {
       spdlog::info("Received /course/file2 request from {}", req.remote_addr);
       std::unique_lock<std::mutex> op_lock;
-      if (!tryBeginOperation(op_lock, res, "course_file2")) {
+      if (!tryBeginOperation(op_lock, req, res, "course_file2")) {
         return;
       }
 
@@ -1269,7 +1373,7 @@ class JVLinkHTTPServer {
     try {
       spdlog::info("Received /course/image request from {}", req.remote_addr);
       std::unique_lock<std::mutex> op_lock;
-      if (!tryBeginOperation(op_lock, res, "course_image")) {
+      if (!tryBeginOperation(op_lock, req, res, "course_image")) {
         return;
       }
 
@@ -1422,7 +1526,7 @@ class JVLinkHTTPServer {
 
       auto session_lock = std::make_shared<std::unique_lock<std::mutex>>(jvlink_operation_mutex_, std::try_to_lock);
       if (!session_lock->owns_lock()) {
-        setBusyResponse(res, "query_realtime");
+        setBusyResponse(req, res, "query_realtime");
         return;
       }
 
@@ -1491,11 +1595,7 @@ class JVLinkHTTPServer {
               };
 
               // ハートビート（空行）を定期送信してクライアントのread timeoutを跨ぐ
-              int heartbeat_sec = 0;
-              if (const char* hb = std::getenv("JVLINK_SERVER_STREAM_HEARTBEAT_SEC")) {
-                int v = std::atoi(hb);
-                if (v > 0) heartbeat_sec = v;
-              }
+              int heartbeat_sec = getStreamHeartbeatSec();
               std::thread heartbeat_thread;
               if (heartbeat_sec > 0) {
                 heartbeat_thread = std::thread([&]() {
@@ -1644,10 +1744,10 @@ class JVLinkHTTPServer {
     }
   }
 
-  void handleEventStart(const httplib::Request&, httplib::Response& res) {
+  void handleEventStart(const httplib::Request& req, httplib::Response& res) {
     spdlog::info("Handling /event/start request...");
     std::unique_lock<std::mutex> op_lock;
-    if (!tryBeginOperation(op_lock, res, "event_start")) {
+    if (!tryBeginOperation(op_lock, req, res, "event_start")) {
       return;
     }
     json response;
@@ -1662,10 +1762,10 @@ class JVLinkHTTPServer {
     res.set_content(response.dump(), "application/json");
   }
 
-  void handleEventStop(const httplib::Request&, httplib::Response& res) {
+  void handleEventStop(const httplib::Request& req, httplib::Response& res) {
     spdlog::info("Handling /event/stop request...");
     std::unique_lock<std::mutex> op_lock;
-    if (!tryBeginOperation(op_lock, res, "event_stop")) {
+    if (!tryBeginOperation(op_lock, req, res, "event_stop")) {
       return;
     }
     json response;

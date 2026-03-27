@@ -177,7 +177,7 @@ CLIの一部の動作は、環境変数で設定できます。
 - `JVLINK_HTTP_TIMEOUT`: HTTPリクエスト全体のタイムアウト秒。
 - `JVLINK_STREAM_READ_TIMEOUT`: ストリーミング読み取りタイムアウト秒。
 - `JVLINK_LOG_LEVEL`: ログレベル (`debug`, `info`, `warn`, `error`)。
-- `JVLINK_SERVER_STREAM_HEARTBEAT_SEC`: ストリーミング時に空行を定期送信する間隔（秒）。未設定または0で無効。
+- `JVLINK_SERVER_STREAM_HEARTBEAT_SEC`: ストリーミング時に空行を定期送信する間隔（秒）。既定は30、`0` で無効。
 - `GITHUB_TOKEN`: サーバー実行ファイルをダウンロードする際に使用するGitHubトークン。
 
 ## エラーハンドリングと終了コード

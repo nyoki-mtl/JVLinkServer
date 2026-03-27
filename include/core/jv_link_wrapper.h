@@ -54,6 +54,14 @@ class JVStreamReadException : public std::runtime_error {
 };
 
 /**
+ * @brief Exception for cooperative stream cancellation
+ */
+class JVOperationCanceledException : public std::runtime_error {
+ public:
+  explicit JVOperationCanceledException(const std::string& message) : std::runtime_error(message) {}
+};
+
+/**
  * @brief Wrapper class for JV-Link COM component
  *
  * Provides a C++ interface to the JV-Link COM API for accessing JRA-VAN horse racing data.
@@ -174,7 +182,8 @@ class JVLinkWrapper {
   void queryStored(const std::string& dataspec, const std::string& fromdate, long option, int max_records,
                    const std::function<void(const std::string&)>& record_callback,
                    const std::function<void(const JVQueryResult&)>& meta_callback,
-                   const std::vector<std::string>& filter_record_types = {});
+                   const std::vector<std::string>& filter_record_types = {},
+                   const std::function<bool()>& cancel_requested = {});
 
   /**
    * @brief Queries and streams real-time data from JV-Link

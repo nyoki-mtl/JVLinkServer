@@ -69,6 +69,19 @@ json makeErrorResponse(const char* description) {
   return makeResponse(description, makeJsonContent(makeSchemaRef("#/components/schemas/Error")));
 }
 
+json makeBusyErrorResponse(const char* description) {
+  json response = makeErrorResponse(description);
+  response["headers"] = {{"Retry-After",
+                          {{"description", "Suggested retry delay in seconds"}, {"schema", {{"type", "integer"}}}}},
+                         {"X-JVLink-Busy",
+                          {{"description", "Indicates the request was rejected because the single JV-Link session is busy"},
+                           {"schema", {{"type", "string"}, {"example", "1"}}}}},
+                         {"X-JVLink-Operation",
+                          {{"description", "Operation name associated with the busy rejection"},
+                           {"schema", {{"type", "string"}, {"example", "query_stored"}}}}}};
+  return response;
+}
+
 json makeRequestBody(json schema) {
   json request_body = json::object();
   request_body["required"] = true;
@@ -120,11 +133,17 @@ std::string OpenAPIHandler::generateOpenAPISpec() const {
     op["description"] = "Check if the server is running and healthy";
     op["operationId"] = "getHealth";
 
+    json busy_metrics_schema = makeObjectSchema(
+        {{"count", {{"type", "integer"}, {"example", 3}}},
+         {"last_timestamp", {{"type", "integer"}, {"nullable", true}, {"example", 1711112222}}}});
+    json metrics_schema = makeObjectSchema({{"busy", std::move(busy_metrics_schema)}});
+
     json responses = json::object();
     responses["200"] = makeObjectResponse(
         "Server is healthy",
         {{"status", {{"type", "string"}, {"example", "healthy"}}},
-         {"timestamp", {{"type", "string"}, {"format", "date-time"}}}});
+         {"timestamp", {{"type", "integer"}, {"example", 1711111111}}},
+         {"metrics", std::move(metrics_schema)}});
     op["responses"] = std::move(responses);
     paths["/health"] = json{{"get", std::move(op)}};
   }
@@ -188,7 +207,7 @@ std::string OpenAPIHandler::generateOpenAPISpec() const {
     responses["200"] = makeResponse("NDJSON stream (first line: meta or error, following lines: records)",
                                     makeTextContent("application/x-ndjson", "Line-delimited JSON payloads"));
     responses["400"] = makeErrorResponse("Bad request");
-    responses["503"] = makeErrorResponse("JV-Link session busy");
+    responses["503"] = makeBusyErrorResponse("JV-Link session busy");
     responses["500"] = makeErrorResponse("Internal server error");
     op["responses"] = std::move(responses);
     paths["/query/stored"] = json{{"post", std::move(op)}};
@@ -213,7 +232,7 @@ std::string OpenAPIHandler::generateOpenAPISpec() const {
     responses["200"] = makeResponse("NDJSON stream (first line: meta or error, following lines: records)",
                                     makeTextContent("application/x-ndjson", "Line-delimited JSON payloads"));
     responses["400"] = makeErrorResponse("Bad request");
-    responses["503"] = makeErrorResponse("JV-Link session busy");
+    responses["503"] = makeBusyErrorResponse("JV-Link session busy");
     responses["500"] = makeErrorResponse("Internal server error");
     op["responses"] = std::move(responses);
     paths["/query/realtime"] = json{{"post", std::move(op)}};

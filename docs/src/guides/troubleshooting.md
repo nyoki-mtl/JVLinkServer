@@ -36,6 +36,7 @@ async with Client(config) as client:
 
 - `JVServerConfig.timeout` を延長
 - `query_stored(..., stream_read_timeout=...)` を調整
+- 長いストリーミングでは `JVLINK_SERVER_STREAM_HEARTBEAT_SEC` を確認する（既定: `30` 秒、`0` で無効）
 - `record_types` を指定して取得量を絞る
 
 ## 認証・JVOpenエラー
