@@ -2,7 +2,7 @@
 
 import logging
 
-__version__ = "0.8.1"
+__version__ = "0.8.2"
 __author__ = "Hiroki Taniai"
 
 from pyjvlink.api import Client
@@ -22,6 +22,7 @@ from pyjvlink.errors import (
     JVOpenError,
     JVServerError,
     JVTimeoutError,
+    JVUnavailableError,
     JVValidationError,
 )
 from pyjvlink.types import JVDataSpec, JVServerConfig, QueryOption, RaceKeyParts, build_race_key, build_race_key_short
@@ -48,6 +49,7 @@ __all__ = [
     "JVServerConfig",
     "JVServerError",
     "JVTimeoutError",
+    "JVUnavailableError",
     "JVValidationError",
     "QueryOption",
     "RaceKeyParts",

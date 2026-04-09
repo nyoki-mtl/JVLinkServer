@@ -57,6 +57,8 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     subparsers.add_parser("health", help="Check server health")
     subparsers.add_parser("version", help="Get server version")
+    subparsers.add_parser("session", help="Show current single-session state")
+    subparsers.add_parser("session-reset", help="Reset the current single-session state")
 
     stored_parser = subparsers.add_parser("query-stored", help="Query JV-Link stored data")
     stored_parser.add_argument("dataspec", help="Data specification (e.g., RACE, TOKU)")
@@ -75,11 +77,70 @@ def create_parser() -> argparse.ArgumentParser:
     stored_parser.set_defaults(auto_retry=None)
     stored_parser.add_argument("--max-retries", type=int, help="Maximum retry count")
     stored_parser.add_argument("--retry-delay-ms", type=int, help="Retry delay in milliseconds")
+    busy_retry_mode = stored_parser.add_mutually_exclusive_group()
+    busy_retry_mode.add_argument(
+        "--busy-retry",
+        dest="busy_retry_enabled",
+        action="store_true",
+        help="Enable automatic retry when the session is busy",
+    )
+    busy_retry_mode.add_argument(
+        "--no-busy-retry",
+        dest="busy_retry_enabled",
+        action="store_false",
+        help="Disable automatic retry when the session is busy",
+    )
+    stored_parser.set_defaults(busy_retry_enabled=None)
+    stored_parser.add_argument("--busy-max-retries", type=int, help="Maximum busy retry count")
+    stored_parser.add_argument("--busy-backoff-ms", type=int, help="Busy retry backoff in milliseconds")
+    retry_after_mode = stored_parser.add_mutually_exclusive_group()
+    retry_after_mode.add_argument(
+        "--respect-retry-after",
+        dest="respect_retry_after",
+        action="store_true",
+        help="Use Retry-After header when retrying busy responses",
+    )
+    retry_after_mode.add_argument(
+        "--ignore-retry-after",
+        dest="respect_retry_after",
+        action="store_false",
+        help="Ignore Retry-After header and use --busy-backoff-ms",
+    )
+    stored_parser.set_defaults(respect_retry_after=None)
     stored_parser.add_argument("--format", choices=["json", "raw"], default="json", help="Output format")
 
     realtime_parser = subparsers.add_parser("query-realtime", help="Query JV-Link realtime data")
     realtime_parser.add_argument("dataspec", help="Data specification (e.g., 0B12, 0B15)")
     realtime_parser.add_argument("--key", required=True, help="Required realtime request key (dataspec-specific)")
+    realtime_busy_retry_mode = realtime_parser.add_mutually_exclusive_group()
+    realtime_busy_retry_mode.add_argument(
+        "--busy-retry",
+        dest="busy_retry_enabled",
+        action="store_true",
+        help="Enable automatic retry when the session is busy",
+    )
+    realtime_busy_retry_mode.add_argument(
+        "--no-busy-retry",
+        dest="busy_retry_enabled",
+        action="store_false",
+        help="Disable automatic retry when the session is busy",
+    )
+    realtime_parser.set_defaults(busy_retry_enabled=None, respect_retry_after=None)
+    realtime_parser.add_argument("--busy-max-retries", type=int, help="Maximum busy retry count")
+    realtime_parser.add_argument("--busy-backoff-ms", type=int, help="Busy retry backoff in milliseconds")
+    realtime_retry_after_mode = realtime_parser.add_mutually_exclusive_group()
+    realtime_retry_after_mode.add_argument(
+        "--respect-retry-after",
+        dest="respect_retry_after",
+        action="store_true",
+        help="Use Retry-After header when retrying busy responses",
+    )
+    realtime_retry_after_mode.add_argument(
+        "--ignore-retry-after",
+        dest="respect_retry_after",
+        action="store_false",
+        help="Ignore Retry-After header and use --busy-backoff-ms",
+    )
     realtime_parser.add_argument("--format", choices=["json", "raw"], default="json", help="Output format")
 
     return parser
@@ -116,6 +177,11 @@ async def health_command(client: Client) -> int:
             print("[OK] Server is healthy")
             return 0
         print(f"[FAIL] Server is unhealthy: {status}", file=sys.stderr)
+        jvlink_info = result.get("components", {}).get("jvlink", {})
+        if isinstance(jvlink_info, dict):
+            fault_message = jvlink_info.get("last_fault_message")
+            if isinstance(fault_message, str) and fault_message:
+                print(f"[FAIL] JV-Link detail: {fault_message}", file=sys.stderr)
         return 1
     except JVConnectionError:
         print("[FAIL] Cannot connect to JVLinkServer", file=sys.stderr)
@@ -148,6 +214,34 @@ async def version_command(client: Client) -> int:
         return 1
 
 
+async def session_command(client: Client) -> int:
+    """Run session command."""
+    try:
+        result = await client.get_session()
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
+    except JVConnectionError:
+        print("[FAIL] Cannot connect to JVLinkServer", file=sys.stderr)
+        return 1
+    except Exception as error:
+        print(f"[FAIL] Error: {error}", file=sys.stderr)
+        return 1
+
+
+async def session_reset_command(client: Client) -> int:
+    """Run session-reset command."""
+    try:
+        result = await client.reset_session()
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
+    except JVConnectionError:
+        print("[FAIL] Cannot connect to JVLinkServer", file=sys.stderr)
+        return 1
+    except Exception as error:
+        print(f"[FAIL] Error: {error}", file=sys.stderr)
+        return 1
+
+
 async def stored_command(client: Client, args: argparse.Namespace) -> int:
     """Run query-stored command."""
     try:
@@ -171,6 +265,14 @@ async def stored_command(client: Client, args: argparse.Namespace) -> int:
             kwargs["max_retries"] = args.max_retries
         if args.retry_delay_ms is not None:
             kwargs["retry_delay_ms"] = args.retry_delay_ms
+        if args.busy_retry_enabled is not None:
+            kwargs["busy_retry_enabled"] = args.busy_retry_enabled
+        if args.busy_max_retries is not None:
+            kwargs["busy_max_retries"] = args.busy_max_retries
+        if args.busy_backoff_ms is not None:
+            kwargs["busy_backoff_ms"] = args.busy_backoff_ms
+        if args.respect_retry_after is not None:
+            kwargs["respect_retry_after"] = args.respect_retry_after
 
         result = (
             await client.query_stored_raw(**kwargs) if args.format == "raw" else await client.query_stored(**kwargs)
@@ -213,9 +315,23 @@ async def realtime_command(client: Client, args: argparse.Namespace) -> int:
         print(f"Querying realtime data: {args.dataspec}...", file=sys.stderr)
 
         result = (
-            await client.query_realtime_raw(dataspec=args.dataspec, key=args.key)
+            await client.query_realtime_raw(
+                dataspec=args.dataspec,
+                key=args.key,
+                busy_retry_enabled=args.busy_retry_enabled,
+                busy_max_retries=args.busy_max_retries,
+                busy_backoff_ms=args.busy_backoff_ms,
+                respect_retry_after=args.respect_retry_after,
+            )
             if args.format == "raw"
-            else await client.query_realtime(dataspec=args.dataspec, key=args.key)
+            else await client.query_realtime(
+                dataspec=args.dataspec,
+                key=args.key,
+                busy_retry_enabled=args.busy_retry_enabled,
+                busy_max_retries=args.busy_max_retries,
+                busy_backoff_ms=args.busy_backoff_ms,
+                respect_retry_after=args.respect_retry_after,
+            )
         )
 
         print(f"Total records available: {result.meta.get('count', 'unknown')}", file=sys.stderr)
@@ -269,6 +385,10 @@ async def async_main(args: argparse.Namespace) -> int:
             return await health_command(client)
         if args.command == "version":
             return await version_command(client)
+        if args.command == "session":
+            return await session_command(client)
+        if args.command == "session-reset":
+            return await session_reset_command(client)
         if args.command == "query-stored":
             return await stored_command(client, args)
         if args.command == "query-realtime":

@@ -3,6 +3,30 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [セマンティックバージョニング](https://semver.org/lang/ja/) に準拠しています。
 
+## [Unreleased]
+
+## [0.8.2] - 2026-04-09
+
+### 変更
+- JV-Link COM 呼び出しに watchdog を導入し、`JVRTOpen` などのハング時に server 全体が永久 busy にならず、JV-Link unavailable として fail-fast するよう変更。
+- `/health` を拡張し、JV-Link wrapper / COM worker の fault 状態、現在の処理、unavailable 発生回数を返すよう変更。
+- `/session` と `/session/reset` を追加し、single-session の `busy` / `operation` / `dataspec` / `key` / `request_id` / `started_at` / `elapsed_ms` / `watch_active` を取得できるよう変更。supervisor モードでは stuck session 解放時に worker recycle を行う。
+- busy 503 の header / body に active session の文脈を追加し、`JVBusyError` から `operation` / `path` / `request_id` / `started_at` / `elapsed_ms` / `dataspec` / `key` を参照できるよう変更。
+- `pyjvlink` に `busy_retry_enabled` / `busy_max_retries` / `busy_backoff_ms` / `respect_retry_after` を追加し、`query_stored` / `query_realtime` の両方で同じ busy retry ポリシーを適用できるよう変更。
+- `pyjvlink` に `Client.get_session()` / `Client.reset_session()`、CLI の `session` / `session-reset`、`StoredResult.batches()` / `RealtimeResult.batches()` を追加。
+- OpenAPI の 503 説明を busy / unavailable の両方を含む形に更新。
+
+### 修正
+- `pyjvlink` で `-50301` を `JVUnavailableError` として扱い、HTTP 503 と stream 内 error 行の両方で unavailable を正しく伝播するよう修正。
+- `ProcessManager` が unhealthy な既存 server を「未起動」と誤認して二重起動を試みる問題を修正。
+- `pyjvlink health` とサンプルコードを新しい `/health` スキーマに追従させ、fault 詳細を表示できるよう修正。
+- BN レコード仕様書の内部アンカー不整合を修正。
+- supervisor 経由の `/query/stored` ストリーミングで upstream 完了時に chunked transfer の終端が返らず、client が EOF を待ち続ける不具合を修正。
+
+### テスト
+- unavailable 503 / stream error / unhealthy startup 判定をカバーする Python テストを追加。
+- session snapshot / admin reset / busy retry / busy error context / result batch helper / busy retry 設定バリデーションをカバーする Python テストを追加。
+
 ## [0.8.1] - 2026-03-27
 
 ### 修正

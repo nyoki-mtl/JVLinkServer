@@ -20,7 +20,9 @@
 | 9 | 服色標示 | silk_colors_code | FullWidthString | 60バイト（全角30文字） | 全角スペース | 勝負服の色・模様（例："水色，赤山形一本輪，水色袖"） |
 | 10 | 本年・累計成績情報 | performance_stats | tuple[[BNPerformanceStatsItem](#bnperformancestatsitem), ...] |  |  | 2回繰り返し（本年・累計） |
 
-### BNPerformanceStatsItem（項番10: 本年・累計成績情報）
+### BNPerformanceStatsItem
+
+項番10「本年・累計成績情報」に含まれる繰り返し項目です。
 
 | 項番 | フィールド名 | Python変数名 | 説明 | 型 | 桁数・文字数 | 初期値 |
 |------|-------------|-------------|------|-----|------------|-------|

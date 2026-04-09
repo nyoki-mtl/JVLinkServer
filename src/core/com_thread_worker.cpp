@@ -4,6 +4,14 @@
 
 #include <spdlog/spdlog.h>
 
+namespace {
+
+int64_t currentUnixTimestampSec() {
+  return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
+}  // namespace
+
 ComThreadWorker::ComThreadWorker() {
   m_wakeEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 }
@@ -68,14 +76,43 @@ void ComThreadWorker::stop() {
   spdlog::info("COM thread worker stopped");
 }
 
+std::string ComThreadWorker::getLastFaultMessage() const {
+  std::lock_guard<std::mutex> lock(m_faultMutex);
+  if (!m_lastFaultMessage.empty()) {
+    return m_lastFaultMessage;
+  }
+  return "COM worker is faulted";
+}
+
+ComWorkerHealthSnapshot ComThreadWorker::getHealthSnapshot() const {
+  std::lock_guard<std::mutex> lock(m_faultMutex);
+  ComWorkerHealthSnapshot snapshot;
+  snapshot.running = m_running.load();
+  snapshot.accepting_tasks = m_acceptingTasks.load();
+  snapshot.faulted = m_faulted.load();
+  snapshot.last_fault_timestamp = m_lastFaultTimestamp.load();
+  snapshot.last_fault_message = m_lastFaultMessage;
+  return snapshot;
+}
+
+void ComThreadWorker::recordFault(std::string message) {
+  {
+    std::lock_guard<std::mutex> lock(m_faultMutex);
+    m_lastFaultMessage = std::move(message);
+  }
+  m_lastFaultTimestamp.store(currentUnixTimestampSec());
+  m_faulted.store(true);
+  m_acceptingTasks.store(false);
+}
+
 bool ComThreadWorker::postTask(Task task) {
-  if (!m_running.load() || !m_acceptingTasks.load()) {
+  if (!m_running.load() || !m_acceptingTasks.load() || m_faulted.load()) {
     return false;
   }
 
   {
     std::lock_guard<std::mutex> lock(m_taskMutex);
-    if (!m_running.load() || !m_acceptingTasks.load()) {
+    if (!m_running.load() || !m_acceptingTasks.load() || m_faulted.load()) {
       return false;
     }
     m_taskQueue.push(std::move(task));

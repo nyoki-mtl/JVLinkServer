@@ -35,6 +35,14 @@ static const int JV_DOWNLOAD_PROGRESS_LOG_INTERVAL = 100;  // 進捗ログ出力
 static const long long JV_STREAM_PROGRESS_LOG_INTERVAL = 10000;  // ストリーム進捗ログ出力間隔
 static const LCID JV_JAPANESE_LCID = MAKELCID(MAKELANGID(LANG_JAPANESE, SUBLANG_DEFAULT), SORT_DEFAULT);
 
+namespace {
+
+int64_t currentUnixTimestampSec() {
+  return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
+}  // namespace
+
 // JV-Link COMコンポーネントのCLSID
 // {2AB1774D-0C41-11D7-916F-0003479BEB3F}
 const CLSID JVLinkWrapper::CLSID_JVLink = {0x2AB1774D, 0xC41, 0x11D7, {0x91, 0x6F, 0x0, 0x3, 0x47, 0x9B, 0xEB, 0x3F}};
@@ -53,6 +61,12 @@ JVLinkWrapper::JVLinkWrapper()
 
 JVLinkWrapper::~JVLinkWrapper() {
   if (m_comWorker) {
+    if (hasFatalFault()) {
+      spdlog::error("JVLinkWrapper destructor skipping COM cleanup because wrapper is faulted: {}",
+                    getHealthSnapshot().last_fault_message);
+      return;
+    }
+
     // COMスレッドでクリーンアップを実行
     if (m_comWorker->isRunning()) {
       try {
@@ -79,10 +93,21 @@ bool JVLinkWrapper::initialize(const std::string& sid) {
     return true;
   }
 
+  {
+    std::lock_guard<std::mutex> lock(health_mutex_);
+    faulted_ = false;
+    event_watch_active_ = false;
+    current_operation_started_at_ = 0;
+    last_fault_timestamp_ = 0;
+    current_operation_.clear();
+    last_fault_message_.clear();
+  }
+
   spdlog::info("Initializing JVLinkWrapper with SID: {}", sid);
 
   // COMスレッドでJV-LinkのCOMインスタンスを作成
-  bool createResult = m_comWorker->invokeTask<bool>([this]() { return createJVLinkInstance(); });
+  bool createResult = invokeComCall<bool>("create_jvlink_instance", timeout_config_.control_timeout,
+                                          [this]() { return createJVLinkInstance(); });
 
   if (!createResult) {
     spdlog::error("Failed to create JV-Link COM instance");
@@ -90,12 +115,13 @@ bool JVLinkWrapper::initialize(const std::string& sid) {
   }
 
   // COMスレッドでJVInitを実行
-  long initResult = m_comWorker->invokeTask<long>([this, &sid]() { return performJVInit(sid); });
+  long initResult =
+      invokeComCall<long>("jv_init", timeout_config_.control_timeout, [this, &sid]() { return performJVInit(sid); });
 
   if (initResult != jvlink::error::JV_SUCCESS) {
     spdlog::error("JVInit failed for SID: {} - {}", sid, jvlink::error::getErrorMessage(initResult));
     try {
-      m_comWorker->invokeTask<bool>([this]() {
+      invokeComCall<bool>("cleanup_after_jvinit_failure", timeout_config_.control_timeout, [this]() {
         shutdownOnComThread();
         return true;
       });
@@ -109,7 +135,7 @@ bool JVLinkWrapper::initialize(const std::string& sid) {
 
   // COMスレッドでJVCloseを呼び出す
   try {
-    (void)m_comWorker->invokeTask<bool>([this]() { return performJVClose(); });
+    (void)invokeComCall<bool>("initial_jvclose", timeout_config_.control_timeout, [this]() { return performJVClose(); });
   } catch (const std::exception& e) {
     spdlog::error("Failed to run initial JVClose after JVInit: {}", e.what());
     return false;
@@ -125,7 +151,8 @@ bool JVLinkWrapper::initialize(const std::string& sid) {
   // イベントハンドラーが設定されていれば、COMスレッドで接続を試みる
   if (m_eventHandler) {
     spdlog::info("Event handler is set, attempting to connect event sink after JVInit");
-    bool connectResult = m_comWorker->invokeTask<bool>([this]() { return connectEventSink(); });
+    bool connectResult =
+        invokeComCall<bool>("connect_event_sink", timeout_config_.control_timeout, [this]() { return connectEventSink(); });
     if (!connectResult) {
       spdlog::warn("Failed to connect event sink after JVInit, will retry later");
     }
@@ -135,15 +162,85 @@ bool JVLinkWrapper::initialize(const std::string& sid) {
 }
 
 void JVLinkWrapper::shutdown() {
+  if (hasFatalFault()) {
+    spdlog::warn("Skipping JVLinkWrapper shutdown because wrapper is faulted: {}", getHealthSnapshot().last_fault_message);
+    is_initialized_ = false;
+    return;
+  }
+
   if (!m_comWorker || !m_comWorker->isRunning() || m_comWorker->isInComThread()) {
     shutdownOnComThread();
     return;
   }
 
-  m_comWorker->invokeTask<bool>([this]() {
+  invokeComCall<bool>("shutdown_wrapper", timeout_config_.control_timeout, [this]() {
     shutdownOnComThread();
     return true;
   });
+}
+
+bool JVLinkWrapper::isOperational() const {
+  std::lock_guard<std::mutex> lock(health_mutex_);
+  return is_initialized_ && !faulted_;
+}
+
+bool JVLinkWrapper::hasFatalFault() const {
+  std::lock_guard<std::mutex> lock(health_mutex_);
+  return faulted_;
+}
+
+JVLinkHealthSnapshot JVLinkWrapper::getHealthSnapshot() const {
+  JVLinkHealthSnapshot snapshot;
+  {
+    std::lock_guard<std::mutex> lock(health_mutex_);
+    snapshot.initialized = is_initialized_;
+    snapshot.operational = is_initialized_ && !faulted_;
+    snapshot.faulted = faulted_;
+    snapshot.event_watch_active = event_watch_active_;
+    snapshot.current_operation_started_at = current_operation_started_at_;
+    snapshot.last_fault_timestamp = last_fault_timestamp_;
+    snapshot.current_operation = current_operation_;
+    snapshot.last_fault_message = last_fault_message_;
+  }
+
+  if (m_comWorker) {
+    snapshot.worker = m_comWorker->getHealthSnapshot();
+  }
+
+  if (snapshot.faulted) {
+    snapshot.status = "faulted";
+  } else if (snapshot.initialized) {
+    snapshot.status = "healthy";
+  } else {
+    snapshot.status = "uninitialized";
+  }
+
+  return snapshot;
+}
+
+void JVLinkWrapper::beginOperationTracking(const std::string& operation_name) {
+  std::lock_guard<std::mutex> lock(health_mutex_);
+  current_operation_ = operation_name;
+  current_operation_started_at_ = currentUnixTimestampSec();
+}
+
+void JVLinkWrapper::finishOperationTracking() {
+  std::lock_guard<std::mutex> lock(health_mutex_);
+  current_operation_.clear();
+  current_operation_started_at_ = 0;
+}
+
+void JVLinkWrapper::markFatalFault(const std::string& message) {
+  std::lock_guard<std::mutex> lock(health_mutex_);
+  faulted_ = true;
+  is_initialized_ = false;
+  event_watch_active_ = false;
+  last_fault_timestamp_ = currentUnixTimestampSec();
+  last_fault_message_ = message;
+}
+
+std::chrono::milliseconds JVLinkWrapper::getStoredOpenTimeout(long option) const {
+  return (option == 3 || option == 4) ? timeout_config_.setup_open_timeout : timeout_config_.open_timeout;
 }
 
 void JVLinkWrapper::shutdownOnComThread() {
@@ -153,6 +250,10 @@ void JVLinkWrapper::shutdownOnComThread() {
     jvlink_dispatch_ = nullptr;
   }
   is_initialized_ = false;
+  {
+    std::lock_guard<std::mutex> lock(health_mutex_);
+    event_watch_active_ = false;
+  }
 }
 
 void JVLinkWrapper::queryStored(const std::string& dataspec, const std::string& fromdate, long option, int max_records,
@@ -195,8 +296,9 @@ void JVLinkWrapper::queryStored(const std::string& dataspec, const std::string& 
   if (from_time_to_use.length() == 8) from_time_to_use += "000000";
 
   // JVOpen経由でデータを要求（COMスレッドで実行）
-  long openResult = m_comWorker->invokeTask<long>(
-      [this, &dataspec, &from_time_to_use, option, &read_count, &download_count, &last_timestamp]() {
+  long openResult = invokeComCall<long>("jv_open", getStoredOpenTimeout(option),
+                                        [this, &dataspec, &from_time_to_use, option, &read_count, &download_count,
+                                         &last_timestamp]() {
         return performJVOpen(dataspec, from_time_to_use, option, read_count, download_count, last_timestamp);
       });
 
@@ -221,8 +323,7 @@ void JVLinkWrapper::queryStored(const std::string& dataspec, const std::string& 
   // 必要に応じてダウンロード完了を待つ（COMスレッドで実行）
   if (download_count > 0) {
     long download_status_code = 0;
-    bool downloadResult = m_comWorker->invokeTask<bool>(
-        [this, download_count, &download_status_code]() { return waitForDownload(download_count, &download_status_code); });
+    bool downloadResult = waitForDownload(download_count, &download_status_code, should_cancel);
 
     if (should_cancel()) {
       spdlog::debug("queryStored cancellation requested after download wait for dataspec: {}", dataspec);
@@ -283,8 +384,10 @@ void JVLinkWrapper::queryStored(const std::string& dataspec, const std::string& 
 
       BYTE* buffer = nullptr;
       long size = 0;
-      long ret = m_comWorker->invokeTask<long>(
-          [this, &buffer, &size, &filename]() { return jvGetsWithRetry(&buffer, &size, filename); });
+      long ret = invokeComCall<long>("jv_gets", timeout_config_.stream_read_timeout,
+                                     [this, &buffer, &size, &filename]() {
+                                       return jvGetsWithRetry(&buffer, &size, filename);
+                                     });
 
       // unique_ptrで自動的にメモリ管理
       std::unique_ptr<BYTE[]> buffer_ptr(buffer);
@@ -315,7 +418,8 @@ void JVLinkWrapper::queryStored(const std::string& dataspec, const std::string& 
           // このファイルのレコード種別が対象外の場合、JVSkipでファイル全体をスキップ
           if (should_skip) {
             spdlog::debug("Skipping file with record type '{}' using JVSkip", record_type);
-            long skip_result = m_comWorker->invokeTask<long>([this]() { return performJVSkip(); });
+            long skip_result =
+                invokeComCall<long>("jv_skip", timeout_config_.control_timeout, [this]() { return performJVSkip(); });
             if (skip_result != 0) {
               spdlog::warn("JVSkip failed with code: {}", skip_result);
             }
@@ -428,6 +532,39 @@ bool JVLinkWrapper::performJVClose() {
 
   VariantClear(&result);
   return SUCCEEDED(hr);
+}
+
+long JVLinkWrapper::performJVStatus() {
+  if (!jvlink_dispatch_) {
+    return -999;
+  }
+
+  VARIANT result;
+  VariantInit(&result);
+  HRESULT hr = invokeMethod(jvlink::dispid::JV_STATUS, DISPATCH_METHOD, NULL, 0, &result);
+  if (FAILED(hr) || result.vt != VT_I4) {
+    VariantClear(&result);
+    return jvlink::error::JV_ERROR_DOWNLOAD_FAILED;
+  }
+
+  const long return_code = result.lVal;
+  VariantClear(&result);
+  return return_code;
+}
+
+bool JVLinkWrapper::performJVCancel() {
+  if (!jvlink_dispatch_) {
+    return false;
+  }
+
+  HRESULT hr = invokeMethod(jvlink::dispid::JV_CANCEL, DISPATCH_METHOD, NULL, 0, NULL);
+  if (FAILED(hr)) {
+    spdlog::warn("JVCancel failed with HRESULT: {:#x}", hr);
+    return false;
+  }
+
+  spdlog::info("JVCancel completed successfully");
+  return true;
 }
 
 long JVLinkWrapper::jvGetsWithRetry(BYTE** buff, long* size, char* filename) {
@@ -724,7 +861,8 @@ long JVLinkWrapper::deleteFile(const std::string& filename) {
   if (!m_comWorker || !m_comWorker->isRunning() || m_comWorker->isInComThread()) {
     return performJVFiledelete(filename);
   }
-  return m_comWorker->invokeTask<long>([this, filename]() { return performJVFiledelete(filename); });
+  return invokeComCall<long>("jv_file_delete", timeout_config_.control_timeout,
+                             [this, filename]() { return performJVFiledelete(filename); });
 }
 
 long JVLinkWrapper::fukuFile(const std::string& pattern, const std::string& filepath) {
@@ -749,7 +887,8 @@ long JVLinkWrapper::fukuFile(const std::string& pattern, const std::string& file
   if (!m_comWorker || !m_comWorker->isRunning() || m_comWorker->isInComThread()) {
     return performJVFukuFile(pattern, filepath);
   }
-  return m_comWorker->invokeTask<long>([this, pattern, filepath]() { return performJVFukuFile(pattern, filepath); });
+  return invokeComCall<long>("jv_fuku_file", timeout_config_.control_timeout,
+                             [this, pattern, filepath]() { return performJVFukuFile(pattern, filepath); });
 }
 
 long JVLinkWrapper::fuku(const std::string& pattern, BYTE** buff, long* size) {
@@ -774,7 +913,8 @@ long JVLinkWrapper::fuku(const std::string& pattern, BYTE** buff, long* size) {
   if (!m_comWorker || !m_comWorker->isRunning() || m_comWorker->isInComThread()) {
     return performJVFuku(pattern, buff, size);
   }
-  return m_comWorker->invokeTask<long>([this, pattern, buff, size]() { return performJVFuku(pattern, buff, size); });
+  return invokeComCall<long>("jv_fuku", timeout_config_.control_timeout,
+                             [this, pattern, buff, size]() { return performJVFuku(pattern, buff, size); });
 }
 
 long JVLinkWrapper::courseFile(const std::string& key, std::string& filepath, std::string& explanation) {
@@ -794,8 +934,10 @@ long JVLinkWrapper::courseFile(const std::string& key, std::string& filepath, st
   if (!m_comWorker || !m_comWorker->isRunning() || m_comWorker->isInComThread()) {
     return performJVCourseFile(key, filepath, explanation);
   }
-  return m_comWorker->invokeTask<long>(
-      [this, key, &filepath, &explanation]() { return performJVCourseFile(key, filepath, explanation); });
+  return invokeComCall<long>("jv_course_file", timeout_config_.control_timeout,
+                             [this, key, &filepath, &explanation]() {
+                               return performJVCourseFile(key, filepath, explanation);
+                             });
 }
 
 long JVLinkWrapper::courseFile2(const std::string& key, const std::string& filepath) {
@@ -820,7 +962,8 @@ long JVLinkWrapper::courseFile2(const std::string& key, const std::string& filep
   if (!m_comWorker || !m_comWorker->isRunning() || m_comWorker->isInComThread()) {
     return performJVCourseFile2(key, filepath);
   }
-  return m_comWorker->invokeTask<long>([this, key, filepath]() { return performJVCourseFile2(key, filepath); });
+  return invokeComCall<long>("jv_course_file2", timeout_config_.control_timeout,
+                             [this, key, filepath]() { return performJVCourseFile2(key, filepath); });
 }
 
 bool JVLinkWrapper::createJVLinkInstance() {
@@ -1004,7 +1147,8 @@ long JVLinkWrapper::performJVOpen(const std::string& dataspec, const std::string
   return return_code;
 }
 
-bool JVLinkWrapper::waitForDownload(long download_count, long* last_status_code) {
+bool JVLinkWrapper::waitForDownload(long download_count, long* last_status_code,
+                                    const std::function<bool()>& cancel_requested) {
   /**
    * @brief JVStatusをポーリングして、JV-Linkのダウンロードスレッドが完了するのを待ちます。
    *
@@ -1032,21 +1176,23 @@ bool JVLinkWrapper::waitForDownload(long download_count, long* last_status_code)
   const int poll_interval_ms = JV_DOWNLOAD_POLL_INTERVAL_MS;
   spdlog::debug("Download timeout: {}s for {} files", max_iterations * poll_interval_ms / 1000, download_count);
 
-  for (int i = 0; i < max_iterations; ++i) {
-    VARIANT result;
-    VariantInit(&result);
+  auto should_cancel = [&cancel_requested]() { return cancel_requested && cancel_requested(); };
 
-    // JVStatusを呼び出してダウンロードの進捗を取得
-    if (FAILED(invokeMethod(jvlink::dispid::JV_STATUS, DISPATCH_METHOD, NULL, 0, &result)) || result.vt != VT_I4) {
-      VariantClear(&result);
+  for (int i = 0; i < max_iterations; ++i) {
+    if (should_cancel()) {
+      spdlog::info("Cancellation requested while waiting for download completion");
+      try {
+        (void)invokeComCall<bool>("jv_cancel", timeout_config_.control_timeout, [this]() { return performJVCancel(); });
+      } catch (const std::exception& e) {
+        spdlog::warn("Failed to cancel JV-Link download during shutdown/cancel: {}", e.what());
+      }
       if (last_status_code) {
         *last_status_code = jvlink::error::JV_ERROR_DOWNLOAD_FAILED;
       }
       return false;
     }
 
-    status_val = result.lVal;
-    VariantClear(&result);
+    status_val = invokeComCall<long>("jv_status", timeout_config_.status_timeout, [this]() { return performJVStatus(); });
 
     // ダウンロード完了をチェック
     if (status_val >= download_count) {
@@ -1148,8 +1294,10 @@ std::string JVLinkWrapper::convertBSTRToString(BSTR bstr) const {
 
 void JVLinkWrapper::queryRealtime(const std::string& dataspec, const std::string& key,
                                   const std::function<void(const std::string&)>& record_callback,
-                                  const std::function<void(const JVQueryResult&)>& meta_callback) {
+                                  const std::function<void(const JVQueryResult&)>& meta_callback,
+                                  const std::function<bool()>& cancel_requested) {
   JVQueryResult result = {};
+  auto should_cancel = [&cancel_requested]() { return cancel_requested && cancel_requested(); };
 
   // 初期化状態をチェック
   if (!is_initialized_) {
@@ -1166,7 +1314,12 @@ void JVLinkWrapper::queryRealtime(const std::string& dataspec, const std::string
   if (!m_comWorker || !m_comWorker->isRunning() || m_comWorker->isInComThread()) {
     rt_open_result = performJVRTOpen(dataspec, key);
   } else {
-    rt_open_result = m_comWorker->invokeTask<long>([this, dataspec, key]() { return performJVRTOpen(dataspec, key); });
+    rt_open_result =
+        invokeComCall<long>("jvrt_open", timeout_config_.realtime_open_timeout,
+                            [this, dataspec, key]() { return performJVRTOpen(dataspec, key); });
+  }
+  if (should_cancel()) {
+    throw JVOperationCanceledException("Realtime stream canceled after JVRTOpen");
   }
   if (rt_open_result == -1) {
     // -1は「データなし」を示す正常な戻り値
@@ -1186,6 +1339,9 @@ void JVLinkWrapper::queryRealtime(const std::string& dataspec, const std::string
   // metaコールバック経由で成功を通知
   // リアルタイムデータにはJVOpenのような読み取り/ダウンロード件数はない
   result.success = true;
+  if (should_cancel()) {
+    throw JVOperationCanceledException("Realtime stream canceled before meta callback");
+  }
   meta_callback(result);
 
   // jvGetsはバッファを動的に割り当てるため、事前確保は不要
@@ -1196,10 +1352,19 @@ void JVLinkWrapper::queryRealtime(const std::string& dataspec, const std::string
 
   // 完了するまでレコードを読み込んでストリーミング
   while (true) {
+    if (should_cancel()) {
+      throw JVOperationCanceledException("Realtime stream canceled during read loop");
+    }
+
     BYTE* buffer = nullptr;
     long size = JV_DATA_LARGEST_SIZE;
-    long ret =
-        m_comWorker->invokeTask<long>([this, &buffer, &size, &filename]() { return jvGets(&buffer, &size, filename); });
+    long ret = invokeComCall<long>("jv_gets_realtime", timeout_config_.stream_read_timeout,
+                                   [this, &buffer, &size, &filename]() { return jvGets(&buffer, &size, filename); });
+
+    if (should_cancel()) {
+      delete[] buffer;
+      throw JVOperationCanceledException("Realtime stream canceled after JVGets call");
+    }
 
     if (ret > 0) {
       // レコードの読み取りに成功 - コールバックで送信
@@ -1209,6 +1374,10 @@ void JVLinkWrapper::queryRealtime(const std::string& dataspec, const std::string
       record_count++;
       spdlog::trace("Read record #{} - size: {} bytes, file: {}", record_count, size, filename);
       record_callback(std::string(reinterpret_cast<char*>(buffer), size));
+      if (should_cancel()) {
+        delete[] buffer;
+        throw JVOperationCanceledException("Realtime stream canceled after record callback");
+      }
 
       // jvGetsによって割り当てられたメモリを解放
       delete[] buffer;
@@ -1339,7 +1508,7 @@ long JVLinkWrapper::skipCurrentFile() {
   if (!m_comWorker || !m_comWorker->isRunning() || m_comWorker->isInComThread()) {
     return performJVSkip();
   }
-  return m_comWorker->invokeTask<long>([this]() { return performJVSkip(); });
+  return invokeComCall<long>("jv_skip", timeout_config_.control_timeout, [this]() { return performJVSkip(); });
 }
 
 bool JVLinkWrapper::startEventWatch() {
@@ -1364,7 +1533,7 @@ bool JVLinkWrapper::startEventWatch() {
   if (!jvlink_dispatch_) return false;
 
   // COMスレッドでJVWatchEventを実行
-  long return_code = m_comWorker->invokeTask<long>([this]() {
+  long return_code = invokeComCall<long>("jv_watch_event", timeout_config_.control_timeout, [this]() {
     VARIANT result;
     VariantInit(&result);
     HRESULT hr = invokeMethod(jvlink::dispid::JV_WATCH_EVENT, DISPATCH_METHOD, nullptr, 0, &result);
@@ -1381,6 +1550,8 @@ bool JVLinkWrapper::startEventWatch() {
     // COMスレッドはすでにメッセージポンプを実行しているので、
     // 追加のアクションは不要
     spdlog::info("Event watch started successfully");
+    std::lock_guard<std::mutex> lock(health_mutex_);
+    event_watch_active_ = true;
   }
 
   return return_code == 0;
@@ -1400,7 +1571,7 @@ bool JVLinkWrapper::stopEventWatch() {
   if (!jvlink_dispatch_) return false;
 
   // COMスレッドでJVWatchEventCloseを実行
-  long return_code = m_comWorker->invokeTask<long>([this]() {
+  long return_code = invokeComCall<long>("jv_watch_event_close", timeout_config_.control_timeout, [this]() {
     VARIANT result;
     VariantInit(&result);
     HRESULT hr = invokeMethod(jvlink::dispid::JV_WATCH_EVENT_CLOSE, DISPATCH_METHOD, nullptr, 0, &result);
@@ -1412,6 +1583,10 @@ bool JVLinkWrapper::stopEventWatch() {
   });
 
   spdlog::info("JVWatchEventClose returned: {}", return_code);
+  if (return_code == 0) {
+    std::lock_guard<std::mutex> lock(health_mutex_);
+    event_watch_active_ = false;
+  }
   return return_code == 0;
 }
 

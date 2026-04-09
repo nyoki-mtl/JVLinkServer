@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import platform
 import shutil
 import subprocess
@@ -40,56 +39,52 @@ class ProcessManager:
     def _base_url(self) -> str:
         return f"http://{self.config.host}:{self.config.port}"
 
-    def _is_server_running(self) -> bool:
+    def _probe_server(self) -> tuple[bool, bool, dict[str, Any] | None]:
         try:
             timeout = httpx.Timeout(timeout=5.0, connect=1.0, read=1.0, write=1.0, pool=5.0)
             with httpx.Client(timeout=timeout) as client:
                 response = client.get(f"{self._base_url()}{self._build_url('/health')}")
-                if response.status_code != 200:
-                    return False
                 health_data = response.json()
-                return bool(health_data.get("status") == "healthy")
+                if not isinstance(health_data, dict):
+                    return False, False, None
+                status = health_data.get("status")
+                return True, bool(status == "healthy"), health_data
         except (httpx.ConnectError, httpx.TimeoutException):
-            return False
+            return False, False, None
         except Exception as e:
             logger.warning("Unexpected error during health check: %s", e)
-            return False
+            return False, False, None
 
-    def _try_switch_to_container_host(self) -> bool:
-        if platform.system() == "Windows":
-            return False
-
-        fallback_host = os.environ.get("JVLINK_CONTAINER_HOST", "host.docker.internal").strip()
-        if not fallback_host or fallback_host in ("127.0.0.1", "localhost"):
-            return False
-
-        original_host = self.config.host
-        self.config.host = fallback_host
-        if self._is_server_running():
-            return True
-        self.config.host = original_host
-        return False
+    def _is_server_running(self) -> bool:
+        alive, healthy, _ = self._probe_server()
+        return alive and healthy
 
     async def start(self) -> None:
-        server_running = self._is_server_running()
+        server_alive, server_healthy, health_data = self._probe_server()
         started_local_server = False
 
-        if not server_running and self.config.host in ("127.0.0.1", "localhost"):
+        if not server_alive and self.config.host in ("127.0.0.1", "localhost"):
             if platform.system() == "Windows":
                 await self._start_server()
                 started_local_server = True
             else:
-                server_running = self._try_switch_to_container_host()
-                if not server_running:
-                    raise JVConnectionError(
-                        "JVLinkServer is not running on localhost in this non-Windows environment.\n"
-                        "Run JVLinkServer.exe on the host and set JVLINK_SERVER_HOST=host.docker.internal.\n"
-                        "You can also set JVLINK_CONTAINER_HOST to customize the fallback host."
-                    )
-        elif not server_running:
+                raise JVConnectionError(
+                    "JVLinkServer is not running on localhost in this non-Windows environment.\n"
+                    "Run JVLinkServer.exe on a Windows machine and set JVLINK_SERVER_HOST / JVLINK_SERVER_PORT "
+                    "to that server."
+                )
+        elif not server_alive:
             raise JVConnectionError(
                 f"JVLinkServer is not running on {self.config.host}:{self.config.port}\n"
                 "Please start JVLinkServer on the remote host first."
+            )
+        elif not server_healthy:
+            status = "unknown"
+            if isinstance(health_data, dict):
+                status = str(health_data.get("status", "unknown"))
+            raise JVServerError(
+                f"JVLinkServer is running on {self.config.host}:{self.config.port} but is unhealthy "
+                f"(status={status}). Check /health and restart the server if needed."
             )
 
         try:
@@ -182,10 +177,18 @@ class ProcessManager:
             try:
                 async with httpx.AsyncClient(timeout=3.0) as client:
                     response = await client.get(f"{self._base_url()}{self._build_url('/health')}")
-                    if response.status_code == 200 and response.json().get("status") == "healthy":
+                    health_data = response.json()
+                    if response.status_code == 200 and health_data.get("status") == "healthy":
                         return
+                    if isinstance(health_data, dict) and health_data.get("status") == "unhealthy":
+                        jvlink_info = health_data.get("components", {}).get("jvlink", {})
+                        fault_message = jvlink_info.get("last_fault_message") if isinstance(jvlink_info, dict) else None
+                        detail = f": {fault_message}" if isinstance(fault_message, str) and fault_message else ""
+                        raise JVServerError(f"JVLinkServer started but reported unhealthy status{detail}")
             except Exception as e:
                 logger.debug("Health check attempt failed: %s", e)
+                if isinstance(e, JVServerError):
+                    raise
 
             await asyncio.sleep(1.0)
 

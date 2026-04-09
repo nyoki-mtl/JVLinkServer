@@ -20,11 +20,11 @@ GitHub 版を使う場合:
 pip install git+https://github.com/nyoki-mtl/JVLinkServer.git#subdirectory=python
 ```
 
-## DevContainer / Docker からの接続
+## リモート Windows サーバーへの接続
 
-```bash
-export JVLINK_SERVER_HOST=host.docker.internal
-export JVLINK_SERVER_PORT=8765
+```powershell
+$env:JVLINK_SERVER_HOST = "192.168.10.20"
+$env:JVLINK_SERVER_PORT = "8765"
 ```
 
 ## 動作確認

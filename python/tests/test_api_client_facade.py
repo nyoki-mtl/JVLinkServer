@@ -603,6 +603,27 @@ async def test_stored_result_collect(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_stored_result_batches(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = Client()
+
+    async def fake_query_stored(**_: Any) -> tuple[dict[str, Any], AsyncIterator[dict[str, Any]]]:
+        return {"read_count": 3}, _iter_rows(
+            [
+                {"type": "RA", "data": {"data_code": "1"}},
+                {"type": "SE", "data": {"data_code": "1"}},
+                {"type": "HR", "data": {"data_code": "1"}},
+            ]
+        )
+
+    monkeypatch.setattr(client._transport, "query_stored", fake_query_stored)
+
+    result = await client.query_stored_raw(dataspec="RACE", from_datetime="20260301", option=1)
+    batches = [[record.type for record in batch] async for batch in result.batches(2)]
+
+    assert batches == [["RA", "SE"], ["HR"]]
+
+
+@pytest.mark.asyncio
 async def test_query_stored_raw_handles_non_mapping_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     client = Client()
 
@@ -728,6 +749,27 @@ async def test_realtime_result_collect(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert len(records) == 2
     assert records[0].type == "WE"
+
+
+@pytest.mark.asyncio
+async def test_realtime_result_batches(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = Client()
+
+    async def fake_query_realtime(**_: Any) -> tuple[dict[str, Any], AsyncIterator[dict[str, Any]]]:
+        return {"read_count": 3}, _iter_rows(
+            [
+                {"type": "WE", "data": {"data_code": "1"}},
+                {"type": "WE", "data": {"data_code": "2"}},
+                {"type": "WE", "data": {"data_code": "3"}},
+            ]
+        )
+
+    monkeypatch.setattr(client._transport, "query_realtime", fake_query_realtime)
+
+    result = await client.query_realtime_raw(dataspec="0B14", key="20240101")
+    batches = [[record.type for record in batch] async for batch in result.batches(2)]
+
+    assert batches == [["WE", "WE"], ["WE"]]
 
 
 @pytest.mark.asyncio
@@ -961,6 +1003,34 @@ async def test_get_health_delegates_transport(monkeypatch: pytest.MonkeyPatch) -
 
     result = await client.get_health()
     assert result["status"] == "healthy"
+
+
+@pytest.mark.asyncio
+async def test_get_session_delegates_transport(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = Client()
+
+    async def fake_get_session() -> dict[str, Any]:
+        return {"busy": True, "request_id": "req-4", "watch_active": False}
+
+    monkeypatch.setattr(client._transport, "get_session", fake_get_session)
+
+    result = await client.get_session()
+    assert result["busy"] is True
+    assert result["request_id"] == "req-4"
+
+
+@pytest.mark.asyncio
+async def test_reset_session_delegates_transport(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = Client()
+
+    async def fake_reset_session() -> dict[str, Any]:
+        return {"status": "success", "action": "worker_restarted"}
+
+    monkeypatch.setattr(client._transport, "reset_session", fake_reset_session)
+
+    result = await client.reset_session()
+    assert result["status"] == "success"
+    assert result["action"] == "worker_restarted"
 
 
 @pytest.mark.asyncio

@@ -88,10 +88,15 @@ pyjvlink query-stored RACE 20240101 1 --max-records 10
 pyjvlink query-realtime 0B12 --key 202401070511
 ```
 
+`pyjvlink health` が `unhealthy` を返した場合は、`components.jvlink.last_fault_message` を確認してください。
+
 ## 開発
 
-```bash
-make sync
-make check-full
-make docs
+Windows ネイティブ環境を前提とします。
+
+```powershell
+uv sync --all-extras
+uv run ruff check src tests
+uv run ty check src/pyjvlink
+uv run pytest tests -v
 ```

@@ -358,6 +358,10 @@ class JVServerConfig:
     auto_retry: bool = True  # 破損ファイル時の自動リトライ（デフォルト: 有効）
     max_retries: int = 3  # 最大リトライ回数（デフォルト: 3）
     retry_delay_ms: int = 1000  # リトライ間隔（ミリ秒、デフォルト: 1000）
+    busy_retry_enabled: bool = False  # busy(-202)時の自動リトライ（デフォルト: 無効）
+    busy_max_retries: int = 3  # busy時の最大リトライ回数
+    busy_backoff_ms: int = 1000  # busy時の待機時間（ミリ秒）
+    respect_retry_after: bool = True  # Retry-Afterヘッダーを優先する
 
     def __post_init__(self) -> None:
         self.host = _require_str("host", self.host).strip()
@@ -371,6 +375,10 @@ class JVServerConfig:
         self.auto_retry = _require_bool("auto_retry", self.auto_retry)
         self.max_retries = _require_int("max_retries", self.max_retries)
         self.retry_delay_ms = _require_int("retry_delay_ms", self.retry_delay_ms)
+        self.busy_retry_enabled = _require_bool("busy_retry_enabled", self.busy_retry_enabled)
+        self.busy_max_retries = _require_int("busy_max_retries", self.busy_max_retries)
+        self.busy_backoff_ms = _require_int("busy_backoff_ms", self.busy_backoff_ms)
+        self.respect_retry_after = _require_bool("respect_retry_after", self.respect_retry_after)
 
         if not self.host:
             raise JVInvalidParameterError("host must not be empty.")
@@ -401,3 +409,7 @@ class JVServerConfig:
             raise JVInvalidParameterError(f"max_retries must be >= 0, got {self.max_retries}.")
         if self.retry_delay_ms < 0:
             raise JVInvalidParameterError(f"retry_delay_ms must be >= 0, got {self.retry_delay_ms}.")
+        if self.busy_max_retries < 0:
+            raise JVInvalidParameterError(f"busy_max_retries must be >= 0, got {self.busy_max_retries}.")
+        if self.busy_backoff_ms < 0:
+            raise JVInvalidParameterError(f"busy_backoff_ms must be >= 0, got {self.busy_backoff_ms}.")

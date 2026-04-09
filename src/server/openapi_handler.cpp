@@ -73,12 +73,36 @@ json makeBusyErrorResponse(const char* description) {
   json response = makeErrorResponse(description);
   response["headers"] = {{"Retry-After",
                           {{"description", "Suggested retry delay in seconds"}, {"schema", {{"type", "integer"}}}}},
+                         {"X-Request-Id",
+                          {{"description", "Request identifier for the rejected request"},
+                           {"schema", {{"type", "string"}, {"example", "req-1711111111000-1"}}}}},
                          {"X-JVLink-Busy",
                           {{"description", "Indicates the request was rejected because the single JV-Link session is busy"},
                            {"schema", {{"type", "string"}, {"example", "1"}}}}},
                          {"X-JVLink-Operation",
                           {{"description", "Operation name associated with the busy rejection"},
-                           {"schema", {{"type", "string"}, {"example", "query_stored"}}}}}};
+                           {"schema", {{"type", "string"}, {"example", "query_stored"}}}}},
+                         {"X-JVLink-Session-Request-Id",
+                          {{"description", "Request identifier of the active session holder"},
+                           {"schema", {{"type", "string"}, {"example", "req-1711111110000-7"}}}}},
+                         {"X-JVLink-Session-Path",
+                          {{"description", "Path of the active session holder"},
+                           {"schema", {{"type", "string"}, {"example", "/query/stored"}}}}},
+                         {"X-JVLink-Session-Started-At",
+                          {{"description", "Unix timestamp when the active session started"},
+                           {"schema", {{"type", "integer"}}}}},
+                         {"X-JVLink-Session-Elapsed-Ms",
+                          {{"description", "Elapsed milliseconds since the active session started"},
+                           {"schema", {{"type", "integer"}}}}}};
+  return response;
+}
+
+json makeServiceUnavailableResponse(const char* description) {
+  json response = makeBusyErrorResponse(description);
+  response["headers"]["X-JVLink-Unavailable"] = {
+      {"description", "Indicates JV-Link is unavailable or faulted inside the server"},
+      {"schema", {{"type", "string"}, {"example", "1"}}},
+  };
   return response;
 }
 
@@ -133,19 +157,102 @@ std::string OpenAPIHandler::generateOpenAPISpec() const {
     op["description"] = "Check if the server is running and healthy";
     op["operationId"] = "getHealth";
 
+    json session_schema = makeObjectSchema(
+        {{"busy", {{"type", "boolean"}, {"example", true}}},
+         {"operation", {{"type", "string"}, {"nullable", true}, {"example", "query_stored"}}},
+         {"path", {{"type", "string"}, {"nullable", true}, {"example", "/query/stored"}}},
+         {"dataspec", {{"type", "string"}, {"nullable", true}, {"example", "RACE"}}},
+         {"key", {{"type", "string"}, {"nullable", true}, {"example", "202401070511"}}},
+         {"request_id", {{"type", "string"}, {"nullable", true}, {"example", "req-1711111110000-7"}}},
+         {"remote_addr", {{"type", "string"}, {"nullable", true}, {"example", "127.0.0.1"}}},
+         {"started_at", {{"type", "integer"}, {"nullable", true}, {"example", 1711111111}}},
+         {"elapsed_ms", {{"type", "integer"}, {"example", 1200}}},
+         {"watch_active", {{"type", "boolean"}, {"example", false}}}});
     json busy_metrics_schema = makeObjectSchema(
         {{"count", {{"type", "integer"}, {"example", 3}}},
          {"last_timestamp", {{"type", "integer"}, {"nullable", true}, {"example", 1711112222}}}});
-    json metrics_schema = makeObjectSchema({{"busy", std::move(busy_metrics_schema)}});
+    json unavailable_metrics_schema = makeObjectSchema(
+        {{"count", {{"type", "integer"}, {"example", 1}}},
+         {"last_timestamp", {{"type", "integer"}, {"nullable", true}, {"example", 1711113333}}}});
+    json worker_schema = makeObjectSchema(
+        {{"running", {{"type", "boolean"}, {"example", true}}},
+         {"accepting_tasks", {{"type", "boolean"}, {"example", true}}},
+         {"faulted", {{"type", "boolean"}, {"example", false}}},
+         {"last_fault_message", {{"type", "string"}, {"nullable", true}}},
+         {"last_fault_timestamp", {{"type", "integer"}, {"nullable", true}}}});
+    json components_schema = makeObjectSchema({
+        {"http_server",
+         makeObjectSchema({{"status", {{"type", "string"}, {"example", "healthy"}}},
+                           {"port", {{"type", "integer"}, {"example", 8765}}}})},
+        {"jvlink",
+         makeObjectSchema({{"status", {{"type", "string"}, {"example", "healthy"}}},
+                           {"initialized", {{"type", "boolean"}, {"example", true}}},
+                           {"operational", {{"type", "boolean"}, {"example", true}}},
+                           {"faulted", {{"type", "boolean"}, {"example", false}}},
+                           {"current_operation", {{"type", "string"}, {"nullable", true}}},
+                           {"current_operation_started_at", {{"type", "integer"}, {"nullable", true}}},
+                           {"event_watch_active", {{"type", "boolean"}, {"example", false}}},
+                           {"last_fault_message", {{"type", "string"}, {"nullable", true}}},
+                           {"last_fault_timestamp", {{"type", "integer"}, {"nullable", true}}},
+                           {"worker", std::move(worker_schema)}})},
+    });
+    json metrics_schema =
+        makeObjectSchema({{"busy", std::move(busy_metrics_schema)}, {"unavailable", std::move(unavailable_metrics_schema)}});
+    json health_properties = {{"status", {{"type", "string"}, {"example", "healthy"}}},
+                              {"timestamp", {{"type", "integer"}, {"example", 1711111111}}},
+                              {"components", std::move(components_schema)},
+                              {"metrics", std::move(metrics_schema)},
+                              {"session", session_schema}};
 
     json responses = json::object();
-    responses["200"] = makeObjectResponse(
-        "Server is healthy",
-        {{"status", {{"type", "string"}, {"example", "healthy"}}},
-         {"timestamp", {{"type", "integer"}, {"example", 1711111111}}},
-         {"metrics", std::move(metrics_schema)}});
+    responses["200"] = makeObjectResponse("Server is healthy", health_properties);
+    responses["503"] = makeObjectResponse("Server is unhealthy", health_properties);
     op["responses"] = std::move(responses);
     paths["/health"] = json{{"get", std::move(op)}};
+  }
+
+  {
+    json op = json::object();
+    op["summary"] = "Get current session state";
+    op["description"] = "Returns the currently active single-session holder and watch status";
+    op["operationId"] = "getSession";
+    op["responses"] = json{{"200",
+                            makeObjectResponse(
+                                "Current session snapshot",
+                                {{"busy", {{"type", "boolean"}, {"example", true}}},
+                                 {"operation", {{"type", "string"}, {"nullable", true}}},
+                                 {"path", {{"type", "string"}, {"nullable", true}}},
+                                 {"dataspec", {{"type", "string"}, {"nullable", true}}},
+                                 {"key", {{"type", "string"}, {"nullable", true}}},
+                                 {"request_id", {{"type", "string"}, {"nullable", true}}},
+                                 {"remote_addr", {{"type", "string"}, {"nullable", true}}},
+                                 {"started_at", {{"type", "integer"}, {"nullable", true}}},
+                                 {"elapsed_ms", {{"type", "integer"}, {"example", 1200}}},
+                                 {"watch_active", {{"type", "boolean"}, {"example", false}}}})}};
+    paths["/session"] = json{{"get", std::move(op)}};
+  }
+
+  {
+    json op = json::object();
+    op["summary"] = "Reset the active session";
+    op["description"] = "Request cancellation of the active session or recycle the worker when running under supervisor";
+    op["operationId"] = "resetSession";
+    op["responses"] = json{
+        {"200",
+         makeObjectResponse("Session reset completed",
+                            {{"status", {{"type", "string"}, {"example", "success"}}},
+                             {"action", {{"type", "string"}, {"example", "released"}}},
+                             {"message", {{"type", "string"}}},
+                             {"session", {{"type", "object"}}}})},
+        {"202",
+         makeObjectResponse("Session reset accepted",
+                            {{"status", {{"type", "string"}, {"example", "accepted"}}},
+                             {"action", {{"type", "string"}, {"example", "cancel_requested"}}},
+                             {"message", {{"type", "string"}}},
+                             {"session", {{"type", "object"}}}})},
+        {"503", makeServiceUnavailableResponse("JV-Link worker is unavailable")},
+    };
+    paths["/session/reset"] = json{{"post", std::move(op)}};
   }
 
   {
@@ -207,7 +314,7 @@ std::string OpenAPIHandler::generateOpenAPISpec() const {
     responses["200"] = makeResponse("NDJSON stream (first line: meta or error, following lines: records)",
                                     makeTextContent("application/x-ndjson", "Line-delimited JSON payloads"));
     responses["400"] = makeErrorResponse("Bad request");
-    responses["503"] = makeBusyErrorResponse("JV-Link session busy");
+    responses["503"] = makeServiceUnavailableResponse("JV-Link session busy or unavailable");
     responses["500"] = makeErrorResponse("Internal server error");
     op["responses"] = std::move(responses);
     paths["/query/stored"] = json{{"post", std::move(op)}};
@@ -232,7 +339,7 @@ std::string OpenAPIHandler::generateOpenAPISpec() const {
     responses["200"] = makeResponse("NDJSON stream (first line: meta or error, following lines: records)",
                                     makeTextContent("application/x-ndjson", "Line-delimited JSON payloads"));
     responses["400"] = makeErrorResponse("Bad request");
-    responses["503"] = makeBusyErrorResponse("JV-Link session busy");
+    responses["503"] = makeServiceUnavailableResponse("JV-Link session busy or unavailable");
     responses["500"] = makeErrorResponse("Internal server error");
     op["responses"] = std::move(responses);
     paths["/query/realtime"] = json{{"post", std::move(op)}};
@@ -248,6 +355,7 @@ std::string OpenAPIHandler::generateOpenAPISpec() const {
     responses["200"] = makeObjectResponse(
         "Event monitoring started",
         {{"status", {{"type", "string"}, {"example", "started"}}}, {"message", {{"type", "string"}}}});
+    responses["503"] = makeServiceUnavailableResponse("JV-Link session busy or unavailable");
     op["responses"] = std::move(responses);
     paths["/event/start"] = json{{"post", std::move(op)}};
   }
@@ -262,6 +370,7 @@ std::string OpenAPIHandler::generateOpenAPISpec() const {
     responses["200"] = makeObjectResponse(
         "Event monitoring stopped",
         {{"status", {{"type", "string"}, {"example", "stopped"}}}, {"message", {{"type", "string"}}}});
+    responses["503"] = makeServiceUnavailableResponse("JV-Link session busy or unavailable");
     op["responses"] = std::move(responses);
     paths["/event/stop"] = json{{"post", std::move(op)}};
   }

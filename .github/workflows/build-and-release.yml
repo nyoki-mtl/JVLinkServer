@@ -12,10 +12,10 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       
     - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v1
+      uses: microsoft/setup-msbuild@v3
       
     - name: Build C++ server
       run: |
@@ -23,7 +23,7 @@ jobs:
         cmake --build build --config Release
         
     - name: Upload C++ artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: cpp-server
         path: build/Release/JVLinkServer.exe
@@ -34,10 +34,10 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       
     - name: Setup Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.11'
         
@@ -45,7 +45,7 @@ jobs:
       run: pip install uv
       
     - name: Download C++ artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: cpp-server
         path: cpp-server/
@@ -93,7 +93,7 @@ jobs:
         python -m twine check python/dist/*.whl
 
     - name: Upload Windows Python distribution artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: python-distributions-windows
         path: python/dist/*.whl
@@ -103,10 +103,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Setup Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.11'
 
@@ -150,7 +150,7 @@ jobs:
         python -m twine check python/dist/*
 
     - name: Upload portable Python distribution artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: python-distributions-portable
         path: python/dist/*
@@ -165,22 +165,22 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       
     - name: Download C++ artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: cpp-server
         path: cpp-server/
         
     - name: Download Windows Python distribution artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: python-distributions-windows
         path: dist/
 
     - name: Download portable Python distribution artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: python-distributions-portable
         path: dist/

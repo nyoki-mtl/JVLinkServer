@@ -28,6 +28,21 @@ class RealtimeQueryMeta(TypedDict, total=False):
     last_file_timestamp: str
 
 
+class SessionInfo(TypedDict, total=False):
+    """Current single-session snapshot."""
+
+    busy: bool
+    operation: str | None
+    path: str | None
+    dataspec: str | None
+    key: str | None
+    request_id: str | None
+    remote_addr: str | None
+    started_at: int | None
+    elapsed_ms: int
+    watch_active: bool
+
+
 class HealthServiceInfo(TypedDict, total=False):
     name: str
     version: str
@@ -38,11 +53,30 @@ class HealthComponentInfo(TypedDict, total=False):
     status: str
     port: int
     initialized: bool
+    operational: bool
+    faulted: bool
+    current_operation: str | None
+    current_operation_started_at: int | None
+    last_fault_message: str | None
+    last_fault_timestamp: int | None
+
+
+class HealthWorkerInfo(TypedDict, total=False):
+    running: bool
+    accepting_tasks: bool
+    faulted: bool
+    last_fault_message: str | None
+    last_fault_timestamp: int | None
+
+
+class HealthJVLinkComponentInfo(HealthComponentInfo, total=False):
+    event_watch_active: bool
+    worker: HealthWorkerInfo
 
 
 class HealthComponentsInfo(TypedDict, total=False):
     http_server: HealthComponentInfo
-    jvlink: HealthComponentInfo
+    jvlink: HealthJVLinkComponentInfo
 
 
 class HealthBusyMetricsInfo(TypedDict, total=False):
@@ -52,6 +86,7 @@ class HealthBusyMetricsInfo(TypedDict, total=False):
 
 class HealthMetricsInfo(TypedDict, total=False):
     busy: HealthBusyMetricsInfo
+    unavailable: HealthBusyMetricsInfo
 
 
 class HealthResponse(TypedDict, total=False):
@@ -60,6 +95,7 @@ class HealthResponse(TypedDict, total=False):
     service: HealthServiceInfo
     components: HealthComponentsInfo
     metrics: HealthMetricsInfo
+    session: SessionInfo
     error: str
 
 
@@ -110,3 +146,10 @@ class SaveCourseResponse(TypedDict, total=False):
     message: str
     key: str
     filepath: str
+
+
+class SessionResetResponse(TypedDict, total=False):
+    status: str
+    action: str
+    message: str
+    session: SessionInfo

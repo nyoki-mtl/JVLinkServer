@@ -16,15 +16,15 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.12'
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v7
 
     - name: Install dependencies
       working-directory: python
@@ -41,15 +41,15 @@ jobs:
   typecheck:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.12'
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v7
 
     - name: Install dependencies
       working-directory: python
@@ -66,15 +66,15 @@ jobs:
         python-version: ['3.10', '3.11', '3.12']
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v7
 
     - name: Install dependencies
       working-directory: python
@@ -95,7 +95,7 @@ jobs:
 
     - name: Upload coverage to Codecov
       if: matrix.python-version == '3.12'
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v6
       with:
         directory: ./python
         file: ./python/coverage.xml
@@ -108,15 +108,15 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.12'
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@v7
 
     - name: Install dependencies
       working-directory: python
@@ -133,7 +133,7 @@ jobs:
         python -m twine check dist/*
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: python-package-distributions
         path: python/dist/

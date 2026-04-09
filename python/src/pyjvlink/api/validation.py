@@ -398,6 +398,33 @@ def validate_retry_overrides(max_retries: int | None, retry_delay_ms: int | None
     return max_retries, retry_delay_ms
 
 
+def validate_busy_retry_overrides(
+    busy_retry_enabled: bool | None,
+    busy_max_retries: int | None,
+    busy_backoff_ms: int | None,
+    respect_retry_after: bool | None,
+) -> tuple[bool | None, int | None, int | None, bool | None]:
+    """Validate optional per-call busy retry overrides."""
+    if busy_retry_enabled is not None and not isinstance(busy_retry_enabled, bool):
+        raise JVInvalidParameterError(f"busy_retry_enabled must be a boolean, got {type(busy_retry_enabled).__name__}.")
+    if busy_max_retries is not None and (not isinstance(busy_max_retries, int) or isinstance(busy_max_retries, bool)):
+        raise JVInvalidParameterError(
+            f"busy_max_retries must be an integer >= 0, got {type(busy_max_retries).__name__}."
+        )
+    if busy_backoff_ms is not None and (not isinstance(busy_backoff_ms, int) or isinstance(busy_backoff_ms, bool)):
+        raise JVInvalidParameterError(f"busy_backoff_ms must be an integer >= 0, got {type(busy_backoff_ms).__name__}.")
+    if respect_retry_after is not None and not isinstance(respect_retry_after, bool):
+        raise JVInvalidParameterError(
+            f"respect_retry_after must be a boolean, got {type(respect_retry_after).__name__}."
+        )
+
+    if busy_max_retries is not None and busy_max_retries < 0:
+        raise JVInvalidParameterError(f"busy_max_retries must be >= 0, got {busy_max_retries}.")
+    if busy_backoff_ms is not None and busy_backoff_ms < 0:
+        raise JVInvalidParameterError(f"busy_backoff_ms must be >= 0, got {busy_backoff_ms}.")
+    return busy_retry_enabled, busy_max_retries, busy_backoff_ms, respect_retry_after
+
+
 def validate_max_records(max_records: int) -> int:
     """Validate query max_records argument."""
     if not isinstance(max_records, int) or isinstance(max_records, bool):

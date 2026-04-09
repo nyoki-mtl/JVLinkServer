@@ -9,6 +9,8 @@ from pyjvlink.api.types import (
     RealtimeQueryMeta,
     SaveCourseResponse,
     SaveUniformResponse,
+    SessionInfo,
+    SessionResetResponse,
     StoredQueryMeta,
     VersionResponse,
 )
@@ -22,6 +24,8 @@ __all__ = [
     "RealtimeResult",
     "SaveCourseResponse",
     "SaveUniformResponse",
+    "SessionInfo",
+    "SessionResetResponse",
     "StoredQueryMeta",
     "StoredResult",
     "VersionResponse",

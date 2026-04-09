@@ -8,44 +8,44 @@ import pytest
 
 from pyjvlink import JVServerConfig
 from pyjvlink._internal.runtime import ProcessManager
-from pyjvlink.errors import JVTimeoutError
+from pyjvlink.errors import JVConnectionError, JVServerError, JVTimeoutError
 
 
-def test_try_switch_to_container_host_success(monkeypatch) -> None:
+@pytest.mark.asyncio
+async def test_start_requires_remote_host_on_non_windows(monkeypatch: pytest.MonkeyPatch) -> None:
     manager = ProcessManager(JVServerConfig(host="127.0.0.1", port=8765))
 
     monkeypatch.setattr("pyjvlink._internal.runtime.process_manager.platform.system", lambda: "Linux")
-    monkeypatch.setenv("JVLINK_CONTAINER_HOST", "host.docker.internal")
+    monkeypatch.setattr(ProcessManager, "_probe_server", lambda self: (False, False, None))
 
-    def fake_is_server_running(self):  # noqa: ANN001
-        return self.config.host == "host.docker.internal"
-
-    monkeypatch.setattr(ProcessManager, "_is_server_running", fake_is_server_running)
-
-    assert manager._try_switch_to_container_host() is True
-    assert manager.config.host == "host.docker.internal"
+    with pytest.raises(JVConnectionError, match="set JVLINK_SERVER_HOST / JVLINK_SERVER_PORT"):
+        await manager.start()
 
 
-def test_try_switch_to_container_host_failure_restores_original_host(monkeypatch) -> None:
-    manager = ProcessManager(JVServerConfig(host="localhost", port=8765))
+@pytest.mark.asyncio
+async def test_start_uses_remote_host_without_local_autostart(monkeypatch: pytest.MonkeyPatch) -> None:
+    manager = ProcessManager(JVServerConfig(host="192.168.10.20", port=8765))
+    started = False
+    waited = False
 
     monkeypatch.setattr("pyjvlink._internal.runtime.process_manager.platform.system", lambda: "Linux")
-    monkeypatch.setenv("JVLINK_CONTAINER_HOST", "host.docker.internal")
-    monkeypatch.setattr(ProcessManager, "_is_server_running", lambda self: False)
+    monkeypatch.setattr(ProcessManager, "_probe_server", lambda self: (True, True, {"status": "healthy"}))
 
-    assert manager._try_switch_to_container_host() is False
-    assert manager.config.host == "localhost"
+    async def fake_start_server() -> None:
+        nonlocal started
+        started = True
 
+    async def fake_wait_for_server() -> None:
+        nonlocal waited
+        waited = True
 
-def test_try_switch_to_container_host_is_disabled_on_windows(monkeypatch) -> None:
-    manager = ProcessManager(JVServerConfig(host="localhost", port=8765))
+    monkeypatch.setattr(manager, "_start_server", fake_start_server)
+    monkeypatch.setattr(manager, "_wait_for_server", fake_wait_for_server)
 
-    monkeypatch.setattr("pyjvlink._internal.runtime.process_manager.platform.system", lambda: "Windows")
-    monkeypatch.setenv("JVLINK_CONTAINER_HOST", "host.docker.internal")
-    monkeypatch.setattr(ProcessManager, "_is_server_running", lambda self: True)
+    await manager.start()
 
-    assert manager._try_switch_to_container_host() is False
-    assert manager.config.host == "localhost"
+    assert started is False
+    assert waited is True
 
 
 @pytest.mark.asyncio
@@ -57,7 +57,7 @@ async def test_start_cleans_up_local_server_when_wait_fails(monkeypatch: pytest.
         pass
 
     monkeypatch.setattr("pyjvlink._internal.runtime.process_manager.platform.system", lambda: "Windows")
-    monkeypatch.setattr(ProcessManager, "_is_server_running", lambda self: False)
+    monkeypatch.setattr(ProcessManager, "_probe_server", lambda self: (False, False, None))
 
     async def fake_start_server() -> None:
         manager._server_process = _FakeProcess()  # type: ignore[assignment]
@@ -103,6 +103,17 @@ class _HealthyAsyncClient:
         return _HealthyResponse()
 
 
+class _UnhealthyResponse:
+    status_code = 503
+
+    @staticmethod
+    def json() -> dict[str, Any]:
+        return {
+            "status": "unhealthy",
+            "components": {"jvlink": {"last_fault_message": "JV-Link COM task timed out during jvrt_open"}},
+        }
+
+
 @pytest.mark.asyncio
 async def test_wait_for_server_returns_without_extra_sleep_on_healthy(monkeypatch: pytest.MonkeyPatch) -> None:
     manager = ProcessManager(JVServerConfig(startup_timeout=5))
@@ -116,6 +127,45 @@ async def test_wait_for_server_returns_without_extra_sleep_on_healthy(monkeypatc
 
     await manager._wait_for_server()
     assert sleep_calls == []
+
+
+@pytest.mark.asyncio
+async def test_start_raises_when_server_is_running_but_unhealthy(monkeypatch: pytest.MonkeyPatch) -> None:
+    manager = ProcessManager(JVServerConfig(host="127.0.0.1", port=8765))
+
+    monkeypatch.setattr(
+        ProcessManager,
+        "_probe_server",
+        lambda self: (True, False, {"status": "unhealthy"}),
+    )
+
+    with pytest.raises(JVServerError, match="but is unhealthy"):
+        await manager.start()
+
+
+class _UnhealthyAsyncClient:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        _ = (args, kwargs)
+
+    async def __aenter__(self) -> _UnhealthyAsyncClient:
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        _ = (exc_type, exc, tb)
+
+    async def get(self, url: str) -> _UnhealthyResponse:
+        _ = url
+        return _UnhealthyResponse()
+
+
+@pytest.mark.asyncio
+async def test_wait_for_server_fails_fast_on_unhealthy_status(monkeypatch: pytest.MonkeyPatch) -> None:
+    manager = ProcessManager(JVServerConfig(startup_timeout=5))
+
+    monkeypatch.setattr("pyjvlink._internal.runtime.process_manager.httpx.AsyncClient", _UnhealthyAsyncClient)
+
+    with pytest.raises(JVServerError, match="timed out during jvrt_open"):
+        await manager._wait_for_server()
 
 
 class _FailingAsyncClient:

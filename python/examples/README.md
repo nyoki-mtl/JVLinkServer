@@ -77,6 +77,8 @@ python basic/health_check.py
   - JV-Link: healthy (初期化済み: はい)
 ```
 
+`/health` が `unhealthy` の場合は、サンプルは `JV-Link 障害詳細` を表示します。
+
 ### Step 2: データ取得の基本を学ぶ
 
 競走馬マスタデータを取得して、基本的な使い方を理解します。

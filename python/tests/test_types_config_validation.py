@@ -85,6 +85,21 @@ def test_auto_retry_must_be_boolean() -> None:
         JVServerConfig(auto_retry="true")  # type: ignore[arg-type]
 
 
+def test_busy_retry_enabled_must_be_boolean() -> None:
+    with pytest.raises(JVInvalidParameterError, match="busy_retry_enabled must be a boolean"):
+        JVServerConfig(busy_retry_enabled="true")  # type: ignore[arg-type]
+
+
+def test_busy_max_retries_must_be_non_negative() -> None:
+    with pytest.raises(JVInvalidParameterError, match="busy_max_retries must be >= 0"):
+        JVServerConfig(busy_max_retries=-1)
+
+
+def test_busy_backoff_ms_must_be_non_negative() -> None:
+    with pytest.raises(JVInvalidParameterError, match="busy_backoff_ms must be >= 0"):
+        JVServerConfig(busy_backoff_ms=-1)
+
+
 def test_option_4_includes_ming() -> None:
     assert JVDataSpec.MING in VALID_DATASPECS_BY_OPTION[4]
 

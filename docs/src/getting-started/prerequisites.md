@@ -4,7 +4,7 @@
 
 - JV-Link は Windows 専用 32-bit COM コンポーネントです。
 - JVLinkServer は Windows 32-bit で実行する必要があります。
-- PyJVLink クライアントは Linux/macOS からも利用できます（リモート接続）。
+- 開発・ビルド・テストも Windows ネイティブ環境を前提とします。
 
 ## 2. 認証・初期化
 

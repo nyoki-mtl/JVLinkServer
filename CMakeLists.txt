@@ -64,6 +64,7 @@ set(RECORD_PARSER_SOURCES
 # Server executable
 add_executable(JVLinkServer
     src/server/main.cpp
+    src/server/supervisor_http_server.cpp
     src/server/openapi_handler.cpp
     ${JVLINK_LIB_SOURCES}
     ${RECORD_PARSER_SOURCES}

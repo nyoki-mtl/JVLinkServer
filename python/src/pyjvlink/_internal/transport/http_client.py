@@ -18,9 +18,12 @@ from pyjvlink.api.types import (
     HealthResponse,
     SaveCourseResponse,
     SaveUniformResponse,
+    SessionInfo,
+    SessionResetResponse,
     VersionResponse,
 )
 from pyjvlink.errors import (
+    JVBusyError,
     JVConnectionError,
     JVDataError,
     JVServerError,
@@ -83,12 +86,86 @@ class HttpTransport:
             return None
         return retry_after if retry_after >= 0 else None
 
-    def _parse_server_error(self, error: httpx.HTTPStatusError) -> tuple[str, int, int | None]:
+    @staticmethod
+    def _parse_optional_int(value: object) -> int | None:
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+        if not isinstance(value, str):
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            return None
+
+    @classmethod
+    def _extract_busy_context(
+        cls,
+        response: httpx.Response,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        session_payload = payload.get("session") if isinstance(payload, dict) else None
+        session = session_payload if isinstance(session_payload, dict) else None
+        if response.headers.get("X-JVLink-Busy") != "1" and session is None:
+            return None
+
+        context: dict[str, Any] = {}
+        operation = response.headers.get("X-JVLink-Operation")
+        if not operation and isinstance(payload, dict):
+            payload_operation = payload.get("operation")
+            if isinstance(payload_operation, str):
+                operation = payload_operation
+        if not operation and session is not None:
+            session_operation = session.get("operation")
+            if isinstance(session_operation, str):
+                operation = session_operation
+        if operation:
+            context["operation"] = operation
+
+        path = response.headers.get("X-JVLink-Session-Path")
+        if not path and session is not None:
+            session_path = session.get("path")
+            if isinstance(session_path, str):
+                path = session_path
+        if path:
+            context["path"] = path
+
+        request_id = response.headers.get("X-JVLink-Session-Request-Id")
+        if not request_id and session is not None:
+            session_request_id = session.get("request_id")
+            if isinstance(session_request_id, str):
+                request_id = session_request_id
+        if request_id:
+            context["request_id"] = request_id
+
+        started_at = cls._parse_optional_int(response.headers.get("X-JVLink-Session-Started-At"))
+        if started_at is None and session is not None:
+            started_at = cls._parse_optional_int(session.get("started_at"))
+        if started_at is not None:
+            context["started_at"] = started_at
+
+        elapsed_ms = cls._parse_optional_int(response.headers.get("X-JVLink-Session-Elapsed-Ms"))
+        if elapsed_ms is None and session is not None:
+            elapsed_ms = cls._parse_optional_int(session.get("elapsed_ms"))
+        if elapsed_ms is not None:
+            context["elapsed_ms"] = elapsed_ms
+
+        if session is not None:
+            for key_name in ("dataspec", "key"):
+                value = session.get(key_name)
+                if isinstance(value, str):
+                    context[key_name] = value
+            context["session"] = session
+
+        return context or None
+
+    def _parse_server_error(self, error: httpx.HTTPStatusError) -> tuple[str, int, int | None, dict[str, Any] | None]:
         error_code = error.response.status_code
         error_message = error.response.text
         retry_after = self._parse_retry_after(error.response)
+        payload: dict[str, Any] | None = None
         try:
-            payload = cast(dict[str, Any], error.response.json())
+            parsed = cast(dict[str, Any], error.response.json())
+            payload = parsed if isinstance(parsed, dict) else None
             error_info = payload.get("error")
             if isinstance(error_info, dict):
                 parsed_message = error_info.get("message")
@@ -99,13 +176,14 @@ class HttpTransport:
                     error_code = parsed_code
         except (ValueError, KeyError, AttributeError):
             logger.debug("Failed to parse structured error from response body")
-        return error_message, error_code, retry_after
+        return error_message, error_code, retry_after, self._extract_busy_context(error.response, payload)
 
     def _raise_server_error(
         self,
         error_message: str,
         error_code: int,
         retry_after: int | None,
+        busy_context: dict[str, Any] | None,
         cause: Exception,
     ) -> NoReturn:
         raise build_error_for_code(
@@ -113,7 +191,45 @@ class HttpTransport:
             error_message,
             default_exc=JVServerError,
             retry_after=retry_after,
+            busy_context=busy_context,
         ) from cause
+
+    async def _call_with_busy_retry(
+        self,
+        operation: str,
+        request_call: Any,
+        *,
+        enabled: bool | None,
+        max_retries: int | None,
+        backoff_ms: int | None,
+        respect_retry_after: bool | None,
+    ) -> Any:
+        effective_enabled = self.config.busy_retry_enabled if enabled is None else enabled
+        effective_max_retries = self.config.busy_max_retries if max_retries is None else max_retries
+        effective_backoff_ms = self.config.busy_backoff_ms if backoff_ms is None else backoff_ms
+        effective_respect_retry_after = (
+            self.config.respect_retry_after if respect_retry_after is None else respect_retry_after
+        )
+
+        attempt = 0
+        while True:
+            try:
+                return await request_call()
+            except JVBusyError as exc:
+                if not effective_enabled or attempt >= effective_max_retries:
+                    raise
+                attempt += 1
+                delay_ms = effective_backoff_ms
+                if effective_respect_retry_after and exc.retry_after is not None:
+                    delay_ms = exc.retry_after * 1000
+                logger.info(
+                    "Retrying busy request %s after %sms (attempt %s/%s)",
+                    operation,
+                    delay_ms,
+                    attempt,
+                    effective_max_retries,
+                )
+                await asyncio.sleep(delay_ms / 1000)
 
     async def _request_json(
         self, method: str, endpoint: str, *, payload: dict[str, Any] | None = None
@@ -127,8 +243,8 @@ class HttpTransport:
                 raise JVDataError(f"Invalid JSON response format: expected object, got {type(parsed).__name__}.")
             return cast(dict[str, Any], parsed)
         except httpx.HTTPStatusError as e:
-            error_message, error_code, retry_after = self._parse_server_error(e)
-            self._raise_server_error(error_message, error_code, retry_after, e)
+            error_message, error_code, retry_after, busy_context = self._parse_server_error(e)
+            self._raise_server_error(error_message, error_code, retry_after, busy_context, e)
         except httpx.TimeoutException as e:
             raise JVTimeoutError(f"HTTP request timeout: {endpoint}") from e
         except httpx.ConnectError as e:
@@ -147,8 +263,8 @@ class HttpTransport:
             response.raise_for_status()
             return response
         except httpx.HTTPStatusError as e:
-            error_message, error_code, retry_after = self._parse_server_error(e)
-            self._raise_server_error(error_message, error_code, retry_after, e)
+            error_message, error_code, retry_after, busy_context = self._parse_server_error(e)
+            self._raise_server_error(error_message, error_code, retry_after, busy_context, e)
         except httpx.TimeoutException as e:
             raise JVTimeoutError(f"HTTP request timeout: {endpoint}") from e
         except httpx.ConnectError as e:
@@ -199,10 +315,13 @@ class HttpTransport:
                 finally:
                     response_closed = True
 
-        async def parse_http_status_error(error: httpx.HTTPStatusError) -> tuple[str, int, int | None]:
+        async def parse_http_status_error(
+            error: httpx.HTTPStatusError,
+        ) -> tuple[str, int, int | None, dict[str, Any] | None]:
             error_message = f"HTTP communication error (status {error.response.status_code})"
             error_code = error.response.status_code
             retry_after = self._parse_retry_after(error.response)
+            parsed_body: dict[str, Any] | None = None
             try:
                 error_text = await error.response.aread()
                 decoded_error = error_text.decode("utf-8", errors="replace")
@@ -211,14 +330,20 @@ class HttpTransport:
                 try:
                     error_body = json.loads(error_text)
                 except json.JSONDecodeError:
-                    return error_message, error_code, retry_after
+                    return error_message, error_code, retry_after, self._extract_busy_context(error.response, None)
 
                 if not isinstance(error_body, dict):
-                    return error_message, error_code, retry_after
+                    return error_message, error_code, retry_after, self._extract_busy_context(error.response, None)
+                parsed_body = error_body
 
                 error_info = error_body.get("error")
                 if not isinstance(error_info, dict):
-                    return error_message, error_code, retry_after
+                    return (
+                        error_message,
+                        error_code,
+                        retry_after,
+                        self._extract_busy_context(error.response, parsed_body),
+                    )
 
                 parsed_message = error_info.get("message")
                 if isinstance(parsed_message, str) and parsed_message.strip():
@@ -228,7 +353,7 @@ class HttpTransport:
                     error_code = parsed_code
             except (httpx.StreamError, UnicodeDecodeError) as e:
                 logger.debug("Failed to read error response body: %s", e)
-            return error_message, error_code, retry_after
+            return error_message, error_code, retry_after, self._extract_busy_context(error.response, parsed_body)
 
         try:
             response = await response_context_manager.__aenter__()
@@ -237,13 +362,14 @@ class HttpTransport:
             try:
                 response.raise_for_status()
             except httpx.HTTPStatusError as e:
-                error_message, error_code, retry_after = await parse_http_status_error(e)
+                error_message, error_code, retry_after, busy_context = await parse_http_status_error(e)
                 await close_response()
                 raise build_error_for_code(
                     error_code,
                     error_message,
                     default_exc=JVServerError,
                     retry_after=retry_after,
+                    busy_context=busy_context,
                 ) from e
 
             line_iterator = response.aiter_lines()
@@ -261,10 +387,15 @@ class HttpTransport:
 
             if "error" in meta_data:
                 error_info = meta_data["error"]
-                raise JVServerError(
-                    f"JVLinkServer stream error: {error_info.get('message', 'Unknown error')}",
-                    error_code=error_info.get("code"),
-                )
+                error_message = error_info.get("message", "Unknown error")
+                error_code = error_info.get("code")
+                if isinstance(error_code, int):
+                    raise build_error_for_code(
+                        error_code,
+                        f"JVLinkServer stream error: {error_message}",
+                        default_exc=JVServerError,
+                    )
+                raise JVServerError(f"JVLinkServer stream error: {error_message}", error_code=error_code)
 
             if "meta" not in meta_data:
                 raise JVDataError("Missing 'meta' in streaming response header.")
@@ -294,9 +425,17 @@ class HttpTransport:
                             if isinstance(payload, dict) and "error" in payload:
                                 error_info = payload.get("error")
                                 if isinstance(error_info, dict):
+                                    error_message = error_info.get("message", "Unknown error")
+                                    error_code = error_info.get("code")
+                                    if isinstance(error_code, int):
+                                        raise build_error_for_code(
+                                            error_code,
+                                            f"JVLinkServer stream error: {error_message}",
+                                            default_exc=JVServerError,
+                                        )
                                     raise JVServerError(
-                                        f"JVLinkServer stream error: {error_info.get('message', 'Unknown error')}",
-                                        error_code=error_info.get("code"),
+                                        f"JVLinkServer stream error: {error_message}",
+                                        error_code=error_code,
                                     )
                                 raise JVServerError("JVLinkServer stream error: Unknown error")
                             yield payload
@@ -336,6 +475,10 @@ class HttpTransport:
         auto_retry: bool | None = None,
         max_retries: int | None = None,
         retry_delay_ms: int | None = None,
+        busy_retry_enabled: bool | None = None,
+        busy_max_retries: int | None = None,
+        busy_backoff_ms: int | None = None,
+        respect_retry_after: bool | None = None,
         exclude_deletions: bool = False,
         stream_read_timeout: int | None = None,
     ) -> tuple[dict[str, Any], AsyncGenerator[dict[str, Any], None]]:
@@ -359,10 +502,17 @@ class HttpTransport:
         if record_types is not None:
             payload["record_types"] = record_types
 
-        meta, gen = await self._fetch_and_parse_stream(
-            "/query/stored",
-            payload,
-            read_timeout_override=stream_read_timeout,
+        meta, gen = await self._call_with_busy_retry(
+            "query_stored",
+            lambda: self._fetch_and_parse_stream(
+                "/query/stored",
+                payload,
+                read_timeout_override=stream_read_timeout,
+            ),
+            enabled=busy_retry_enabled,
+            max_retries=busy_max_retries,
+            backoff_ms=busy_backoff_ms,
+            respect_retry_after=respect_retry_after,
         )
 
         if not exclude_deletions:
@@ -387,9 +537,21 @@ class HttpTransport:
         self,
         dataspec: str,
         key: str,
+        *,
+        busy_retry_enabled: bool | None = None,
+        busy_max_retries: int | None = None,
+        busy_backoff_ms: int | None = None,
+        respect_retry_after: bool | None = None,
     ) -> tuple[dict[str, Any], AsyncGenerator[dict[str, Any], None]]:
         payload = {"dataspec": dataspec, "key": key}
-        return await self._fetch_and_parse_stream("/query/realtime", payload)
+        return await self._call_with_busy_retry(
+            "query_realtime",
+            lambda: self._fetch_and_parse_stream("/query/realtime", payload),
+            enabled=busy_retry_enabled,
+            max_retries=busy_max_retries,
+            backoff_ms=busy_backoff_ms,
+            respect_retry_after=respect_retry_after,
+        )
 
     async def delete_file(self, filename: str) -> DeleteFileResponse:
         return cast(
@@ -436,7 +598,37 @@ class HttpTransport:
         )
 
     async def get_health(self) -> HealthResponse:
-        return cast(HealthResponse, await self._request_json("GET", "/health"))
+        client = self._require_client()
+
+        try:
+            response = await client.request("GET", self._build_url("/health"))
+            if response.status_code not in (200, 503):
+                response.raise_for_status()
+
+            try:
+                payload = response.json()
+            except ValueError as e:
+                raise JVDataError(f"Invalid JSON response from JVLinkServer: {e}") from e
+
+            if not isinstance(payload, dict):
+                raise JVDataError("Invalid JSON response from JVLinkServer: expected object")
+
+            return cast(HealthResponse, payload)
+        except httpx.TimeoutException as e:
+            raise JVTimeoutError("HTTP request timeout - server may be overloaded") from e
+        except httpx.ConnectError as e:
+            raise JVConnectionError(f"HTTP connection failed - JVLinkServer not responding: {e}") from e
+        except httpx.NetworkError as e:
+            raise JVConnectionError(f"HTTP network error - Python <-> C++ communication failed: {e}") from e
+        except httpx.HTTPStatusError as e:
+            error_message, error_code, retry_after, busy_context = self._parse_server_error(e)
+            self._raise_server_error(error_message, error_code, retry_after, busy_context, e)
+
+    async def get_session(self) -> SessionInfo:
+        return cast(SessionInfo, await self._request_json("GET", "/session"))
+
+    async def reset_session(self) -> SessionResetResponse:
+        return cast(SessionResetResponse, await self._request_json("POST", "/session/reset", payload={}))
 
     async def get_version(self) -> VersionResponse:
         return cast(VersionResponse, await self._request_json("GET", "/version"))

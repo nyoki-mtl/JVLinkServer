@@ -19,6 +19,7 @@ from pyjvlink.errors import (
     JVInvalidKeyError,
     JVServerError,
     JVTimeoutError,
+    JVUnavailableError,
 )
 from pyjvlink.types import JVServerConfig
 
@@ -63,6 +64,30 @@ class _FakeAsyncClient:
     def stream(self, method: str, endpoint: str, **kwargs: Any) -> _FakeStreamContext:
         _ = (method, endpoint, kwargs)
         return self._stream_context
+
+
+class _SequenceStreamClient:
+    def __init__(self, stream_contexts: list[_FakeStreamContext]) -> None:
+        self._stream_contexts = stream_contexts
+
+    async def request(self, method: str, endpoint: str, json: dict[str, Any] | None = None) -> httpx.Response:
+        _ = (method, endpoint, json)
+        raise AssertionError("request() should not be called in this test")
+
+    async def post(
+        self,
+        endpoint: str,
+        json: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> httpx.Response:
+        _ = (endpoint, json, timeout)
+        raise AssertionError("post() should not be called in this test")
+
+    def stream(self, method: str, endpoint: str, **kwargs: Any) -> _FakeStreamContext:
+        _ = (method, endpoint, kwargs)
+        if not self._stream_contexts:
+            raise AssertionError("No remaining stream contexts")
+        return self._stream_contexts.pop(0)
 
 
 class _FakeRequestClient:
@@ -190,11 +215,32 @@ async def test_fetch_stream_http_status_reads_body_before_close() -> None:
 
 @pytest.mark.asyncio
 async def test_fetch_stream_busy_503_maps_to_busy_error_with_retry_after() -> None:
-    error_body = {"error": {"message": "JV-Link session is busy", "code": -202}}
+    error_body = {
+        "error": {"message": "JV-Link session is busy", "code": -202},
+        "operation": "query_stored",
+        "session": {
+            "busy": True,
+            "operation": "query_stored",
+            "path": "/query/stored",
+            "request_id": "req-1",
+            "started_at": 1711111111,
+            "elapsed_ms": 2500,
+            "dataspec": "RACE",
+            "watch_active": False,
+        },
+    }
     response = _FakeHTTPErrorResponse(
         status_code=503,
         body=error_body,
-        headers={"Retry-After": "1", "X-JVLink-Busy": "1"},
+        headers={
+            "Retry-After": "1",
+            "X-JVLink-Busy": "1",
+            "X-JVLink-Operation": "query_stored",
+            "X-JVLink-Session-Request-Id": "req-1",
+            "X-JVLink-Session-Path": "/query/stored",
+            "X-JVLink-Session-Started-At": "1711111111",
+            "X-JVLink-Session-Elapsed-Ms": "2500",
+        },
     )
     stream_context = _FakeStreamContext(response)
 
@@ -207,6 +253,32 @@ async def test_fetch_stream_busy_503_maps_to_busy_error_with_retry_after() -> No
     assert stream_context.closed is True
     assert exc_info.value.error_code == -202
     assert exc_info.value.retry_after == 1
+    assert exc_info.value.operation == "query_stored"
+    assert exc_info.value.path == "/query/stored"
+    assert exc_info.value.request_id == "req-1"
+    assert exc_info.value.started_at == 1711111111
+    assert exc_info.value.elapsed_ms == 2500
+    assert exc_info.value.dataspec == "RACE"
+
+
+@pytest.mark.asyncio
+async def test_fetch_stream_unavailable_503_maps_to_unavailable_error() -> None:
+    error_body = {"error": {"message": "JV-Link wrapper is not operational", "code": -50301}}
+    response = _FakeHTTPErrorResponse(
+        status_code=503,
+        body=error_body,
+        headers={"X-JVLink-Unavailable": "1"},
+    )
+    stream_context = _FakeStreamContext(response)
+
+    transport = HttpTransport(JVServerConfig())
+    transport._client = _FakeAsyncClient(stream_context)  # type: ignore[assignment]
+
+    with pytest.raises(JVUnavailableError, match="JV-Link wrapper is not operational") as exc_info:
+        await transport._fetch_and_parse_stream("/query/stored", payload={})
+
+    assert stream_context.closed is True
+    assert exc_info.value.error_code == -50301
 
 
 @pytest.mark.asyncio
@@ -280,6 +352,27 @@ async def test_fetch_stream_raises_server_error_from_error_row() -> None:
         _ = [record async for record in records]
 
     assert exc_info.value.error_code == -502
+    assert stream_context.closed is True
+
+
+@pytest.mark.asyncio
+async def test_fetch_stream_raises_unavailable_error_from_error_row() -> None:
+    response = _FakeJSONLResponse(
+        [
+            json.dumps({"meta": {}}),
+            json.dumps({"error": {"message": "JV-Link became unavailable", "code": -50301}}),
+        ]
+    )
+    stream_context = _FakeStreamContext(response)
+
+    transport = HttpTransport(JVServerConfig())
+    transport._client = _FakeAsyncClient(stream_context)  # type: ignore[assignment]
+
+    _, records = await transport._fetch_and_parse_stream("/query/stored", payload={})
+    with pytest.raises(JVUnavailableError, match="JV-Link became unavailable") as exc_info:
+        _ = [record async for record in records]
+
+    assert exc_info.value.error_code == -50301
     assert stream_context.closed is True
 
 
@@ -389,18 +482,164 @@ async def test_request_json_maps_network_error_to_connection_error() -> None:
 async def test_request_json_busy_503_maps_to_busy_error_with_retry_after() -> None:
     response = httpx.Response(
         503,
-        json={"error": {"message": "JV-Link session is busy", "code": -202}},
-        headers={"Retry-After": "1", "X-JVLink-Busy": "1"},
-        request=httpx.Request("GET", "http://example.local/health"),
+        json={
+            "error": {"message": "JV-Link session is busy", "code": -202},
+            "session": {
+                "busy": True,
+                "operation": "query_realtime",
+                "path": "/query/realtime",
+                "request_id": "req-2",
+                "started_at": 1711112222,
+                "elapsed_ms": 1500,
+                "key": "202401070511",
+                "watch_active": False,
+            },
+        },
+        headers={"Retry-After": "1", "X-JVLink-Busy": "1", "X-JVLink-Operation": "query_realtime"},
+        request=httpx.Request("GET", "http://example.local/version"),
     )
     transport = HttpTransport(JVServerConfig())
     transport._client = _FakeRequestClient(request_response=response)  # type: ignore[assignment]
 
     with pytest.raises(JVBusyError, match="JV-Link session is busy") as exc_info:
-        await transport.get_health()
+        await transport.get_version()
 
     assert exc_info.value.error_code == -202
     assert exc_info.value.retry_after == 1
+    assert exc_info.value.operation == "query_realtime"
+    assert exc_info.value.path == "/query/realtime"
+    assert exc_info.value.request_id == "req-2"
+    assert exc_info.value.key == "202401070511"
+
+
+@pytest.mark.asyncio
+async def test_query_stored_retries_busy_response_when_enabled() -> None:
+    busy_context = _FakeStreamContext(
+        _FakeHTTPErrorResponse(
+            status_code=503,
+            body={"error": {"message": "JV-Link session is busy", "code": -202}},
+            headers={"Retry-After": "0", "X-JVLink-Busy": "1", "X-JVLink-Operation": "query_stored"},
+        )
+    )
+    success_context = _FakeStreamContext(
+        _FakeJSONLResponse(
+            [json.dumps({"meta": {"read_count": 1}}), json.dumps({"type": "RA", "data": {"data_code": "1"}})]
+        )
+    )
+
+    transport = HttpTransport(JVServerConfig())
+    transport._client = _SequenceStreamClient([busy_context, success_context])  # type: ignore[assignment]
+
+    meta, records = await transport.query_stored(
+        dataspec="RACE",
+        from_datetime="20240101",
+        option=1,
+        busy_retry_enabled=True,
+        busy_max_retries=1,
+        busy_backoff_ms=0,
+        respect_retry_after=False,
+    )
+
+    assert meta["read_count"] == 1
+    assert [record async for record in records] == [{"type": "RA", "data": {"data_code": "1"}}]
+
+
+@pytest.mark.asyncio
+async def test_query_realtime_retries_busy_response_when_enabled() -> None:
+    busy_context = _FakeStreamContext(
+        _FakeHTTPErrorResponse(
+            status_code=503,
+            body={"error": {"message": "JV-Link session is busy", "code": -202}},
+            headers={"Retry-After": "0", "X-JVLink-Busy": "1", "X-JVLink-Operation": "query_realtime"},
+        )
+    )
+    success_context = _FakeStreamContext(
+        _FakeJSONLResponse([json.dumps({"meta": {}}), json.dumps({"type": "RA", "data": {"data_code": "1"}})])
+    )
+
+    transport = HttpTransport(JVServerConfig())
+    transport._client = _SequenceStreamClient([busy_context, success_context])  # type: ignore[assignment]
+
+    meta, records = await transport.query_realtime(
+        dataspec="0B12",
+        key="202401070511",
+        busy_retry_enabled=True,
+        busy_max_retries=1,
+        busy_backoff_ms=0,
+        respect_retry_after=False,
+    )
+
+    assert meta == {}
+    assert [record async for record in records] == [{"type": "RA", "data": {"data_code": "1"}}]
+
+
+@pytest.mark.asyncio
+async def test_get_health_returns_unhealthy_payload_on_503() -> None:
+    response = httpx.Response(
+        503,
+        json={
+            "status": "unhealthy",
+            "components": {"jvlink": {"last_fault_message": "JV-Link wrapper is not operational"}},
+        },
+        headers={"X-JVLink-Unavailable": "1"},
+        request=httpx.Request("GET", "http://example.local/health"),
+    )
+    transport = HttpTransport(JVServerConfig())
+    transport._client = _FakeRequestClient(request_response=response)  # type: ignore[assignment]
+
+    payload = await transport.get_health()
+
+    assert payload["status"] == "unhealthy"
+    assert payload["components"]["jvlink"]["last_fault_message"] == "JV-Link wrapper is not operational"
+
+
+@pytest.mark.asyncio
+async def test_get_session_returns_snapshot_payload() -> None:
+    response = httpx.Response(
+        200,
+        json={"busy": True, "operation": "query_stored", "request_id": "req-3", "watch_active": False},
+        request=httpx.Request("GET", "http://example.local/session"),
+    )
+    transport = HttpTransport(JVServerConfig())
+    transport._client = _FakeRequestClient(request_response=response)  # type: ignore[assignment]
+
+    payload = await transport.get_session()
+
+    assert payload["busy"] is True
+    assert payload["request_id"] == "req-3"
+
+
+@pytest.mark.asyncio
+async def test_reset_session_returns_admin_payload() -> None:
+    response = httpx.Response(
+        200,
+        json={"status": "success", "action": "worker_restarted", "session": {"busy": False, "watch_active": False}},
+        request=httpx.Request("POST", "http://example.local/session/reset"),
+    )
+    transport = HttpTransport(JVServerConfig())
+    transport._client = _FakeRequestClient(request_response=response)  # type: ignore[assignment]
+
+    payload = await transport.reset_session()
+
+    assert payload["status"] == "success"
+    assert payload["action"] == "worker_restarted"
+
+
+@pytest.mark.asyncio
+async def test_request_json_unavailable_503_maps_to_unavailable_error() -> None:
+    response = httpx.Response(
+        503,
+        json={"error": {"message": "JV-Link wrapper is not operational", "code": -50301}},
+        headers={"X-JVLink-Unavailable": "1"},
+        request=httpx.Request("GET", "http://example.local/version"),
+    )
+    transport = HttpTransport(JVServerConfig())
+    transport._client = _FakeRequestClient(request_response=response)  # type: ignore[assignment]
+
+    with pytest.raises(JVUnavailableError, match="JV-Link wrapper is not operational") as exc_info:
+        await transport.get_version()
+
+    assert exc_info.value.error_code == -50301
 
 
 @pytest.mark.asyncio

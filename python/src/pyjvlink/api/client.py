@@ -28,11 +28,14 @@ from .types import (
     RealtimeQueryMeta,
     SaveCourseResponse,
     SaveUniformResponse,
+    SessionInfo,
+    SessionResetResponse,
     StoredQueryMeta,
     VersionResponse,
 )
 from .validation import (
     StoredQueryInput,
+    validate_busy_retry_overrides,
     validate_max_records,
     validate_non_empty_text,
     validate_realtime_query_input,
@@ -174,6 +177,10 @@ class Client:
         auto_retry: bool | None,
         max_retries: int | None,
         retry_delay_ms: int | None,
+        busy_retry_enabled: bool | None,
+        busy_max_retries: int | None,
+        busy_backoff_ms: int | None,
+        respect_retry_after: bool | None,
         exclude_deletions: bool,
         stream_read_timeout: int | None,
         include_raw: bool,
@@ -234,6 +241,10 @@ class Client:
             auto_retry=auto_retry,
             max_retries=max_retries,
             retry_delay_ms=retry_delay_ms,
+            busy_retry_enabled=busy_retry_enabled,
+            busy_max_retries=busy_max_retries,
+            busy_backoff_ms=busy_backoff_ms,
+            respect_retry_after=respect_retry_after,
             exclude_deletions=exclude_deletions,
             stream_read_timeout=stream_read_timeout,
         )
@@ -283,6 +294,10 @@ class Client:
                         auto_retry=auto_retry,
                         max_retries=max_retries,
                         retry_delay_ms=retry_delay_ms,
+                        busy_retry_enabled=busy_retry_enabled,
+                        busy_max_retries=busy_max_retries,
+                        busy_backoff_ms=busy_backoff_ms,
+                        respect_retry_after=respect_retry_after,
                         exclude_deletions=exclude_deletions,
                         stream_read_timeout=stream_read_timeout,
                     )
@@ -316,6 +331,10 @@ class Client:
         stream_read_timeout: int | None = None,
         *,
         include_raw: bool = False,
+        busy_retry_enabled: bool | None = None,
+        busy_max_retries: int | None = None,
+        busy_backoff_ms: int | None = None,
+        respect_retry_after: bool | None = None,
     ) -> StoredResult[WireRecord]:
         normalized = validate_stored_query_input(
             dataspec=dataspec,
@@ -327,6 +346,12 @@ class Client:
         normalized_max_records = validate_max_records(max_records)
         normalized_option = int(option)
         max_retries, retry_delay_ms = validate_retry_overrides(max_retries=max_retries, retry_delay_ms=retry_delay_ms)
+        busy_retry_enabled, busy_max_retries, busy_backoff_ms, respect_retry_after = validate_busy_retry_overrides(
+            busy_retry_enabled=busy_retry_enabled,
+            busy_max_retries=busy_max_retries,
+            busy_backoff_ms=busy_backoff_ms,
+            respect_retry_after=respect_retry_after,
+        )
 
         if len(normalized.dataspecs) > 1:
             return await self._query_stored_raw_fanout(
@@ -336,6 +361,10 @@ class Client:
                 auto_retry=auto_retry,
                 max_retries=max_retries,
                 retry_delay_ms=retry_delay_ms,
+                busy_retry_enabled=busy_retry_enabled,
+                busy_max_retries=busy_max_retries,
+                busy_backoff_ms=busy_backoff_ms,
+                respect_retry_after=respect_retry_after,
                 exclude_deletions=exclude_deletions,
                 stream_read_timeout=stream_read_timeout,
                 include_raw=include_raw,
@@ -352,6 +381,10 @@ class Client:
             auto_retry=auto_retry,
             max_retries=max_retries,
             retry_delay_ms=retry_delay_ms,
+            busy_retry_enabled=busy_retry_enabled,
+            busy_max_retries=busy_max_retries,
+            busy_backoff_ms=busy_backoff_ms,
+            respect_retry_after=respect_retry_after,
             exclude_deletions=exclude_deletions,
             stream_read_timeout=stream_read_timeout,
         )
@@ -399,9 +432,26 @@ class Client:
         key: RealtimeKeyInput,
         *,
         include_raw: bool = False,
+        busy_retry_enabled: bool | None = None,
+        busy_max_retries: int | None = None,
+        busy_backoff_ms: int | None = None,
+        respect_retry_after: bool | None = None,
     ) -> RealtimeResult[WireRecord]:
         normalized_dataspec, normalized_key = validate_realtime_query_input(dataspec=dataspec, key=key)
-        meta, records = await self._transport.query_realtime(dataspec=normalized_dataspec, key=normalized_key)
+        busy_retry_enabled, busy_max_retries, busy_backoff_ms, respect_retry_after = validate_busy_retry_overrides(
+            busy_retry_enabled=busy_retry_enabled,
+            busy_max_retries=busy_max_retries,
+            busy_backoff_ms=busy_backoff_ms,
+            respect_retry_after=respect_retry_after,
+        )
+        meta, records = await self._transport.query_realtime(
+            dataspec=normalized_dataspec,
+            key=normalized_key,
+            busy_retry_enabled=busy_retry_enabled,
+            busy_max_retries=busy_max_retries,
+            busy_backoff_ms=busy_backoff_ms,
+            respect_retry_after=respect_retry_after,
+        )
         wire_stream = wire_record_envelopes(records, include_raw=include_raw)
         return RealtimeResult(meta=cast(RealtimeQueryMeta, meta), records=wire_stream)
 
@@ -420,6 +470,10 @@ class Client:
         stream_read_timeout: int | None = None,
         *,
         include_raw: bool = False,
+        busy_retry_enabled: bool | None = None,
+        busy_max_retries: int | None = None,
+        busy_backoff_ms: int | None = None,
+        respect_retry_after: bool | None = None,
     ) -> StoredResult[DomainRecord]:
         raw_result = await self.query_stored_raw(
             dataspec=dataspec,
@@ -434,6 +488,10 @@ class Client:
             exclude_deletions=exclude_deletions,
             stream_read_timeout=stream_read_timeout,
             include_raw=include_raw,
+            busy_retry_enabled=busy_retry_enabled,
+            busy_max_retries=busy_max_retries,
+            busy_backoff_ms=busy_backoff_ms,
+            respect_retry_after=respect_retry_after,
         )
         decoded_stream = decode_record_envelopes(raw_result.records, self._decoder)
         return StoredResult(meta=raw_result.meta, records=decoded_stream)
@@ -444,13 +502,31 @@ class Client:
         key: RealtimeKeyInput,
         *,
         include_raw: bool = False,
+        busy_retry_enabled: bool | None = None,
+        busy_max_retries: int | None = None,
+        busy_backoff_ms: int | None = None,
+        respect_retry_after: bool | None = None,
     ) -> RealtimeResult[DomainRecord]:
-        raw_result = await self.query_realtime_raw(dataspec=dataspec, key=key, include_raw=include_raw)
+        raw_result = await self.query_realtime_raw(
+            dataspec=dataspec,
+            key=key,
+            include_raw=include_raw,
+            busy_retry_enabled=busy_retry_enabled,
+            busy_max_retries=busy_max_retries,
+            busy_backoff_ms=busy_backoff_ms,
+            respect_retry_after=respect_retry_after,
+        )
         decoded_stream = decode_record_envelopes(raw_result.records, self._decoder)
         return RealtimeResult(meta=raw_result.meta, records=decoded_stream)
 
     async def get_health(self) -> HealthResponse:
         return cast(HealthResponse, await self._transport.get_health())
+
+    async def get_session(self) -> SessionInfo:
+        return cast(SessionInfo, await self._transport.get_session())
+
+    async def reset_session(self) -> SessionResetResponse:
+        return cast(SessionResetResponse, await self._transport.reset_session())
 
     async def get_version(self) -> VersionResponse:
         return cast(VersionResponse, await self._transport.get_version())

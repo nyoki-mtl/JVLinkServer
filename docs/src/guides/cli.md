@@ -172,7 +172,7 @@ SE20240401050101...
 
 CLIの一部の動作は、環境変数で設定できます。
 
-- `JVLINK_SERVER_HOST`: 接続先ホスト名。DevContainerやWSL2では`host.docker.internal`等を指定。
+- `JVLINK_SERVER_HOST`: 接続先ホスト名。既定値は `127.0.0.1`。
 - `JVLINK_SERVER_PORT`: JVLinkラッパーサーバーのポート番号。
 - `JVLINK_HTTP_TIMEOUT`: HTTPリクエスト全体のタイムアウト秒。
 - `JVLINK_STREAM_READ_TIMEOUT`: ストリーミング読み取りタイムアウト秒。

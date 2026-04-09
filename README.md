@@ -22,9 +22,9 @@ Python App <--> pyjvlink.api.Client <--> transport/runtime/codecs <--> JVLinkSer
 
 ## 前提条件
 
-- Windows 10/11（サーバー実行環境）
+- Windows 10/11
 - JRA-VAN Data Lab ソフトウェア（JV-Link 含む）
-- Python 3.10 以上（PyJVLink 利用時）
+- Python 3.10 以上
 
 ## インストール
 
@@ -61,6 +61,20 @@ if __name__ == "__main__":
 - `python/`: `pyjvlink` パッケージとテスト
 - `docs/`: MkDocs ドキュメント
 - `agent-docs/`: 内部向け仕様書と開発メモ
+
+## 開発
+
+開発・ビルド・テストは Windows ネイティブ環境を前提としています。
+
+```powershell
+cmake --preset vs2022-win32-release
+cmake --build --preset release
+
+cd python
+uv sync --all-extras
+uv run ruff check src tests
+uv run pytest tests -v
+```
 
 ## ライセンス
 

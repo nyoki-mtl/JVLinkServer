@@ -1,6 +1,6 @@
 """PyJVLink exception hierarchy."""
 
-from typing import NoReturn
+from typing import Any, NoReturn
 
 
 class JVLinkError(Exception):
@@ -18,9 +18,35 @@ class JVServerError(JVLinkError):
 class JVBusyError(JVServerError):
     """The single JV-Link session is busy and the request can be retried."""
 
-    def __init__(self, message: str, error_code: int | None = None, retry_after: int | None = None):
+    def __init__(
+        self,
+        message: str,
+        error_code: int | None = None,
+        retry_after: int | None = None,
+        *,
+        operation: str | None = None,
+        path: str | None = None,
+        request_id: str | None = None,
+        started_at: int | None = None,
+        elapsed_ms: int | None = None,
+        dataspec: str | None = None,
+        key: str | None = None,
+        session: dict[str, Any] | None = None,
+    ):
         super().__init__(message, error_code=error_code)
         self.retry_after = retry_after
+        self.operation = operation
+        self.path = path
+        self.request_id = request_id
+        self.started_at = started_at
+        self.elapsed_ms = elapsed_ms
+        self.dataspec = dataspec
+        self.key = key
+        self.session = session
+
+
+class JVUnavailableError(JVServerError):
+    """JVLinkServer is reachable but JV-Link itself is unavailable or faulted."""
 
 
 class JVOpenError(JVServerError):
@@ -80,6 +106,7 @@ class JVNoDataError(JVDataError):
 _ERROR_CODE_MAP: dict[int, type[JVLinkError]] = {
     -1: JVNoDataError,
     -202: JVBusyError,
+    -50301: JVUnavailableError,
     -111: JVInvalidDataSpecError,
     -112: JVInvalidParameterError,
     -113: JVInvalidFromTimeError,
@@ -103,13 +130,14 @@ def build_error_for_code(
     *,
     default_exc: type[JVLinkError] = JVOpenError,
     retry_after: int | None = None,
+    busy_context: dict[str, Any] | None = None,
 ) -> JVLinkError:
     """Build the appropriate exception instance for a JV-Link error code."""
     exc_cls = _ERROR_CODE_MAP.get(error_code, default_exc)
     try:
         if exc_cls is JVBusyError:
-            return exc_cls(message, error_code=error_code, retry_after=retry_after)
-        return exc_cls(message, error_code=error_code)  # type: ignore[call-arg]
+            return exc_cls(message, error_code=error_code, retry_after=retry_after, **(busy_context or {}))
+        return exc_cls(message, error_code=error_code)
     except TypeError:
         # Validation errors do not accept error_code in the constructor.
         exc = exc_cls(message)
@@ -143,6 +171,7 @@ __all__ = [
     "JVOpenError",
     "JVServerError",
     "JVTimeoutError",
+    "JVUnavailableError",
     "JVValidationError",
     "build_error_for_code",
     "raise_for_error_code",

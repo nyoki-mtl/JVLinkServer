@@ -81,8 +81,7 @@ def _schema_all_field_names(record_type: str, *, include_reserved: bool = False)
 def _extract_cpp_structured_data_keys(record_type: str) -> set[str] | None:
     """Parse C++ source to extract structured_data key names.
 
-    Returns None if the C++ file does not exist (e.g. running in devcontainer
-    without C++ sources checked out).
+    Returns None if the C++ file does not exist in the current checkout.
     """
     cpp_path = CPP_RECORDS_DIR / f"{record_type.lower()}_record.cpp"
     if not cpp_path.exists():

@@ -48,7 +48,7 @@ def test_create_parser_supports_global_connection_options() -> None:
     args = parser.parse_args(
         [
             "--host",
-            "host.docker.internal",
+            "192.168.10.20",
             "--port",
             "9000",
             "--timeout",
@@ -60,7 +60,7 @@ def test_create_parser_supports_global_connection_options() -> None:
     )
 
     assert args.command == "health"
-    assert args.host == "host.docker.internal"
+    assert args.host == "192.168.10.20"
     assert args.port == 9000
     assert args.timeout == 45
     assert args.stream_read_timeout == 600

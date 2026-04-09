@@ -8,7 +8,9 @@
 #include <condition_variable>
 #include <csignal>
 #include <cstdlib>
+#include <algorithm>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <memory>
@@ -27,6 +29,7 @@
 #include "json.hpp"
 #include "server/api_version.h"
 #include "server/openapi_handler.h"
+#include "server/supervisor_http_server.h"
 
 using json = nlohmann::json;
 
@@ -34,11 +37,22 @@ namespace {
 
 constexpr const char* kBusyHeaderName = "X-JVLink-Busy";
 constexpr const char* kBusyOperationHeaderName = "X-JVLink-Operation";
+constexpr const char* kRequestIdHeaderName = "X-Request-Id";
 constexpr const char* kRetryAfterHeaderName = "Retry-After";
+constexpr const char* kUnavailableHeaderName = "X-JVLink-Unavailable";
+constexpr const char* kSessionRequestIdHeaderName = "X-JVLink-Session-Request-Id";
+constexpr const char* kSessionPathHeaderName = "X-JVLink-Session-Path";
+constexpr const char* kSessionStartedAtHeaderName = "X-JVLink-Session-Started-At";
+constexpr const char* kSessionElapsedMsHeaderName = "X-JVLink-Session-Elapsed-Ms";
 constexpr int kBusyRetryAfterSec = 1;
 
 int64_t currentUnixTimestampSec() {
   return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
+int64_t currentUnixTimestampMs() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+      .count();
 }
 
 std::string resolveRecordTypeForOutput(const ParsedRecord& record) {
@@ -194,12 +208,59 @@ class JVLinkHTTPServer {
     std::string param;
     int64_t timestamp;
   };
+  struct SessionSnapshot {
+    bool busy = false;
+    bool watch_active = false;
+    std::string operation;
+    std::string path;
+    std::string dataspec;
+    std::string key;
+    std::string request_id;
+    std::string remote_addr;
+    int64_t started_at = 0;
+    int64_t elapsed_ms = 0;
+  };
+
+  class SessionLease {
+   public:
+    SessionLease(JVLinkHTTPServer* server, SessionSnapshot snapshot)
+        : server_(server), snapshot_(std::move(snapshot)), active_(server_ != nullptr) {
+      if (active_) {
+        server_->setActiveSession(snapshot_);
+      }
+    }
+
+    ~SessionLease() {
+      if (active_) {
+        server_->clearActiveSession(snapshot_.request_id);
+      }
+    }
+
+    SessionLease(const SessionLease&) = delete;
+    SessionLease& operator=(const SessionLease&) = delete;
+    SessionLease(SessionLease&&) = delete;
+    SessionLease& operator=(SessionLease&&) = delete;
+
+    const SessionSnapshot& snapshot() const { return snapshot_; }
+
+   private:
+    JVLinkHTTPServer* server_;
+    SessionSnapshot snapshot_;
+    bool active_;
+  };
+
   std::queue<JVEvent> event_queue_;
   std::mutex event_queue_mutex_;
   std::condition_variable event_cv_;
   std::mutex jvlink_operation_mutex_;
+  mutable std::mutex session_state_mutex_;
+  SessionSnapshot active_session_;
+  std::atomic<uint64_t> request_id_counter_{0};
+  std::atomic<uint64_t> session_reset_generation_{0};
   std::atomic<uint64_t> busy_rejection_count_{0};
   std::atomic<int64_t> last_busy_timestamp_{0};
+  std::atomic<uint64_t> unavailable_rejection_count_{0};
+  std::atomic<int64_t> last_unavailable_timestamp_{0};
 
  public:
   /**
@@ -215,6 +276,7 @@ class JVLinkHTTPServer {
     // NDJSON/SSE の小さなチャンクを即時送信しやすくする。
     server_->set_tcp_nodelay(true);
     jvlink_wrapper_ = std::make_unique<JVLinkWrapper>();
+    jvlink_wrapper_->setTimeoutConfig(getTimeoutConfigFromEnv());
     openapi_handler_ = std::make_unique<jvlink::OpenAPIHandler>("127.0.0.1", port_);
 
     // JV-Linkイベントを受信するためのハンドラーを設定
@@ -232,6 +294,14 @@ class JVLinkHTTPServer {
    */
   ~JVLinkHTTPServer() {
     spdlog::info("JVLinkHTTPServer destructor called");
+    if (!running_ && jvlink_wrapper_ && jvlink_wrapper_->hasFatalFault()) {
+      // A timed-out COM call may still be executing inside JV-Link. Intentionally
+      // abandon the wrapper rather than destroying it and risking a blocking join.
+      spdlog::error("Leaking faulted JV-Link wrapper during destructor to avoid blocking process shutdown: {}",
+                    jvlink_wrapper_->getHealthSnapshot().last_fault_message);
+      (void)jvlink_wrapper_.release();
+      return;
+    }
     stop();
   }
 
@@ -252,8 +322,16 @@ class JVLinkHTTPServer {
     }
 
     // JV-Link COMコンポーネントを初期化
-    if (!jvlink_wrapper_->initialize(sid_)) {
-      spdlog::error("Failed to initialize JVLink");
+    try {
+      if (!jvlink_wrapper_->initialize(sid_)) {
+        spdlog::error("Failed to initialize JVLink");
+        return false;
+      }
+    } catch (const JVLinkFatalException& e) {
+      spdlog::error("Fatal JV-Link failure during server start: {}", e.what());
+      if (jvlink_wrapper_) {
+        (void)jvlink_wrapper_.release();
+      }
       return false;
     }
 
@@ -295,8 +373,17 @@ class JVLinkHTTPServer {
     }
 
     if (jvlink_wrapper_) {
-      jvlink_wrapper_->shutdown();
-      spdlog::info("JV-Link shutdown completed");
+      JVLinkHealthSnapshot health = jvlink_wrapper_->getHealthSnapshot();
+      if (health.faulted) {
+        // A faulted wrapper is process-lifetime state in the current architecture.
+        // Releasing it keeps shutdown non-blocking while the process exits.
+        spdlog::error("JV-Link wrapper is faulted during stop; skipping destruction to avoid blocking shutdown: {}",
+                      health.last_fault_message);
+        (void)jvlink_wrapper_.release();
+      } else {
+        jvlink_wrapper_->shutdown();
+        spdlog::info("JV-Link shutdown completed");
+      }
     }
 
     // 全ログを確実に書き込む
@@ -312,30 +399,197 @@ class JVLinkHTTPServer {
   bool isRunning() const { return running_; }
 
  private:
-  void setBusyResponse(const httplib::Request& req, httplib::Response& res, const std::string& operation) {
+  std::string nextRequestId() {
+    const uint64_t seq = request_id_counter_.fetch_add(1, std::memory_order_relaxed) + 1;
+    std::ostringstream oss;
+    oss << "req-" << currentUnixTimestampMs() << "-" << seq;
+    return oss.str();
+  }
+
+  std::string ensureRequestId(const httplib::Request& req, httplib::Response& res) {
+    std::string request_id = req.get_header_value(kRequestIdHeaderName);
+    if (request_id.empty()) {
+      request_id = nextRequestId();
+    }
+    res.set_header(kRequestIdHeaderName, request_id);
+    return request_id;
+  }
+
+  SessionSnapshot makeSessionSnapshot(const httplib::Request& req, const std::string& operation,
+                                      const std::string& request_id, const std::string& dataspec = "",
+                                      const std::string& key = "") const {
+    SessionSnapshot snapshot;
+    snapshot.busy = true;
+    snapshot.operation = operation;
+    snapshot.path = req.path;
+    snapshot.dataspec = dataspec;
+    snapshot.key = key;
+    snapshot.request_id = request_id;
+    snapshot.remote_addr = req.remote_addr;
+    snapshot.started_at = currentUnixTimestampSec();
+    if (jvlink_wrapper_) {
+      snapshot.watch_active = jvlink_wrapper_->getHealthSnapshot().event_watch_active;
+    }
+    return snapshot;
+  }
+
+  void setActiveSession(const SessionSnapshot& snapshot) {
+    std::lock_guard<std::mutex> lock(session_state_mutex_);
+    active_session_ = snapshot;
+  }
+
+  void clearActiveSession(const std::string& request_id) {
+    std::lock_guard<std::mutex> lock(session_state_mutex_);
+    if (active_session_.request_id == request_id) {
+      active_session_ = SessionSnapshot{};
+    }
+  }
+
+  SessionSnapshot getSessionSnapshot() const {
+    SessionSnapshot snapshot;
+    {
+      std::lock_guard<std::mutex> lock(session_state_mutex_);
+      snapshot = active_session_;
+    }
+    if (jvlink_wrapper_) {
+      snapshot.watch_active = jvlink_wrapper_->getHealthSnapshot().event_watch_active;
+    }
+    if (snapshot.busy && snapshot.started_at > 0) {
+      const int64_t elapsed_sec = std::max<int64_t>(0, currentUnixTimestampSec() - snapshot.started_at);
+      snapshot.elapsed_ms = elapsed_sec * 1000;
+    }
+    return snapshot;
+  }
+
+  json buildSessionJson() const {
+    const SessionSnapshot snapshot = getSessionSnapshot();
+    return {{"busy", snapshot.busy},
+            {"operation", snapshot.operation.empty() ? json(nullptr) : json(snapshot.operation)},
+            {"path", snapshot.path.empty() ? json(nullptr) : json(snapshot.path)},
+            {"dataspec", snapshot.dataspec.empty() ? json(nullptr) : json(snapshot.dataspec)},
+            {"key", snapshot.key.empty() ? json(nullptr) : json(snapshot.key)},
+            {"request_id", snapshot.request_id.empty() ? json(nullptr) : json(snapshot.request_id)},
+            {"remote_addr", snapshot.remote_addr.empty() ? json(nullptr) : json(snapshot.remote_addr)},
+            {"started_at", snapshot.started_at > 0 ? json(snapshot.started_at) : json(nullptr)},
+            {"elapsed_ms", snapshot.busy ? json(snapshot.elapsed_ms) : json(0)},
+            {"watch_active", snapshot.watch_active}};
+  }
+
+  bool isSessionResetRequested(uint64_t observed_generation) const {
+    return session_reset_generation_.load(std::memory_order_relaxed) != observed_generation;
+  }
+
+  json requestSessionReset() {
+    const SessionSnapshot before = getSessionSnapshot();
+    session_reset_generation_.fetch_add(1, std::memory_order_relaxed);
+
+    for (int i = 0; i < 20; ++i) {
+      SessionSnapshot current = getSessionSnapshot();
+      if (!current.busy) {
+        return {{"status", "success"},
+                {"message", before.busy ? "Session reset completed." : "No active session."},
+                {"action", before.busy ? "released" : "noop"},
+                {"session", buildSessionJson()}};
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+
+    return {{"status", "accepted"},
+            {"message", "Session reset requested. Active operation is still unwinding."},
+            {"action", "cancel_requested"},
+            {"session", buildSessionJson()}};
+  }
+
+  void setBusyResponse(const httplib::Request& req, httplib::Response& res, const std::string& operation,
+                       const std::string& request_id) {
     const int64_t busy_timestamp = currentUnixTimestampSec();
     busy_rejection_count_.fetch_add(1, std::memory_order_relaxed);
     last_busy_timestamp_.store(busy_timestamp, std::memory_order_relaxed);
+    const SessionSnapshot session = getSessionSnapshot();
 
     spdlog::warn("busy_503 path={} operation={} remote_addr={}", req.path, operation, req.remote_addr);
 
     res.status = 503;
+    res.set_header(kRequestIdHeaderName, request_id);
     res.set_header(kRetryAfterHeaderName, std::to_string(kBusyRetryAfterSec));
     res.set_header(kBusyHeaderName, "1");
-    res.set_header(kBusyOperationHeaderName, operation);
+    res.set_header(kBusyOperationHeaderName, session.operation.empty() ? operation : session.operation);
+    if (!session.request_id.empty()) {
+      res.set_header(kSessionRequestIdHeaderName, session.request_id);
+    }
+    if (!session.path.empty()) {
+      res.set_header(kSessionPathHeaderName, session.path);
+    }
+    if (session.started_at > 0) {
+      res.set_header(kSessionStartedAtHeaderName, std::to_string(session.started_at));
+    }
+    if (session.busy) {
+      res.set_header(kSessionElapsedMsHeaderName, std::to_string(session.elapsed_ms));
+    }
     json error_response = {{"error", {{"code", -202}, {"message", "JV-Link session is busy"}}},
-                           {"operation", operation}};
+                           {"operation", session.operation.empty() ? operation : session.operation},
+                           {"session", buildSessionJson()}};
     res.set_content(error_response.dump(), "application/json; charset=utf-8");
   }
 
+  void setUnavailableResponse(const httplib::Request& req, httplib::Response& res, const std::string& operation,
+                              const std::string& message, const std::string& request_id = "") {
+    const int64_t unavailable_timestamp = currentUnixTimestampSec();
+    unavailable_rejection_count_.fetch_add(1, std::memory_order_relaxed);
+    last_unavailable_timestamp_.store(unavailable_timestamp, std::memory_order_relaxed);
+
+    spdlog::error("unavailable_503 path={} operation={} remote_addr={} reason={}", req.path, operation, req.remote_addr,
+                  message);
+
+    res.status = 503;
+    if (!request_id.empty()) {
+      res.set_header(kRequestIdHeaderName, request_id);
+    }
+    res.set_header(kUnavailableHeaderName, "1");
+    res.set_header(kBusyOperationHeaderName, operation);
+    json error_response = {
+        {"error", {{"code", -50301}, {"message", message}}},
+        {"operation", operation},
+        {"session", buildSessionJson()},
+    };
+    res.set_content(error_response.dump(), "application/json; charset=utf-8");
+  }
+
+  bool ensureWrapperOperational(const httplib::Request& req, httplib::Response& res, const std::string& operation,
+                                const std::string& request_id) {
+    if (!jvlink_wrapper_) {
+      setUnavailableResponse(req, res, operation, "JV-Link wrapper is not available", request_id);
+      return false;
+    }
+
+    JVLinkHealthSnapshot health = jvlink_wrapper_->getHealthSnapshot();
+    if (!health.operational) {
+      std::string message =
+          !health.last_fault_message.empty() ? health.last_fault_message : "JV-Link wrapper is not operational";
+      setUnavailableResponse(req, res, operation, message, request_id);
+      return false;
+    }
+
+    return true;
+  }
+
   bool tryBeginOperation(std::unique_lock<std::mutex>& op_lock, const httplib::Request& req, httplib::Response& res,
-                         const std::string& operation) {
+                         const std::string& operation, const std::string& request_id) {
+    if (!ensureWrapperOperational(req, res, operation, request_id)) {
+      return false;
+    }
     op_lock = std::unique_lock<std::mutex>(jvlink_operation_mutex_, std::try_to_lock);
     if (op_lock.owns_lock()) {
       return true;
     }
-    setBusyResponse(req, res, operation);
+    setBusyResponse(req, res, operation, request_id);
     return false;
+  }
+
+  void handleWrapperFatalException(const httplib::Request& req, httplib::Response& res, const std::string& operation,
+                                   const std::string& request_id, const JVLinkFatalException& e) {
+    spdlog::error("JV-Link fatal failure during {}: {}", operation, e.what());
+    setUnavailableResponse(req, res, operation, e.what(), request_id);
   }
 
   static int getPositiveEnvInt(const char* name, int def) {
@@ -344,6 +598,31 @@ class JVLinkHTTPServer {
 
     int parsed = std::atoi(v);
     return parsed > 0 ? parsed : def;
+  }
+
+  static std::chrono::milliseconds getEnvDurationMs(const char* name, std::chrono::milliseconds def) {
+    const char* v = std::getenv(name);
+    if (!v) {
+      return def;
+    }
+
+    int parsed = std::atoi(v);
+    if (parsed <= 0) {
+      return def;
+    }
+    return std::chrono::seconds(parsed);
+  }
+
+  static JVLinkWrapper::TimeoutConfig getTimeoutConfigFromEnv() {
+    JVLinkWrapper::TimeoutConfig config;
+    config.open_timeout = getEnvDurationMs("JVLINK_COM_OPEN_TIMEOUT_SEC", config.open_timeout);
+    config.setup_open_timeout = getEnvDurationMs("JVLINK_COM_SETUP_OPEN_TIMEOUT_SEC", config.setup_open_timeout);
+    config.realtime_open_timeout =
+        getEnvDurationMs("JVLINK_COM_REALTIME_OPEN_TIMEOUT_SEC", config.realtime_open_timeout);
+    config.stream_read_timeout = getEnvDurationMs("JVLINK_COM_STREAM_READ_TIMEOUT_SEC", config.stream_read_timeout);
+    config.status_timeout = getEnvDurationMs("JVLINK_COM_STATUS_TIMEOUT_SEC", config.status_timeout);
+    config.control_timeout = getEnvDurationMs("JVLINK_COM_CONTROL_TIMEOUT_SEC", config.control_timeout);
+    return config;
   }
 
   static int getStreamHeartbeatSec() {
@@ -386,6 +665,12 @@ class JVLinkHTTPServer {
 
     // サーバー状態確認用エンドポイント
     server_->Get("/health", [this](const httplib::Request& req, httplib::Response& res) { handleHealth(req, res); });
+    server_->Get("/session", [this](const httplib::Request& req, httplib::Response& res) { handleSession(req, res); });
+    server_->Get("/v1/session", [this](const httplib::Request& req, httplib::Response& res) { handleSession(req, res); });
+    server_->Post("/session/reset",
+                  [this](const httplib::Request& req, httplib::Response& res) { handleSessionReset(req, res); });
+    server_->Post("/v1/session/reset",
+                  [this](const httplib::Request& req, httplib::Response& res) { handleSessionReset(req, res); });
 
     // APIバージョン情報エンドポイント
     server_->Get("/version", [this](const httplib::Request& req, httplib::Response& res) { handleVersion(req, res); });
@@ -522,6 +807,38 @@ class JVLinkHTTPServer {
   }
 
   /**
+   * セッション状態リクエストを処理する
+   */
+  void handleSession(const httplib::Request& req, httplib::Response& res) {
+    try {
+      (void)ensureRequestId(req, res);
+      res.set_content(buildSessionJson().dump(), "application/json; charset=utf-8");
+    } catch (const std::exception& e) {
+      spdlog::error("Error in session snapshot: {}", e.what());
+      res.status = 500;
+      json error_response = {{"error", {{"message", e.what()}}}};
+      res.set_content(error_response.dump(), "application/json; charset=utf-8");
+    }
+  }
+
+  /**
+   * セッションリセットリクエストを処理する
+   */
+  void handleSessionReset(const httplib::Request& req, httplib::Response& res) {
+    try {
+      (void)ensureRequestId(req, res);
+      json response = requestSessionReset();
+      res.status = response.value("status", "") == "accepted" ? 202 : 200;
+      res.set_content(response.dump(), "application/json; charset=utf-8");
+    } catch (const std::exception& e) {
+      spdlog::error("Error in session reset: {}", e.what());
+      res.status = 500;
+      json error_response = {{"error", {{"message", e.what()}}}};
+      res.set_content(error_response.dump(), "application/json; charset=utf-8");
+    }
+  }
+
+  /**
    * ヘルスチェックリクエストを処理する
    *
    * サーバーとJV-Linkコンポーネントの状態を確認し、
@@ -530,12 +847,18 @@ class JVLinkHTTPServer {
   void handleHealth(const httplib::Request& req, httplib::Response& res) {
     try {
       spdlog::debug("Health check requested from {}", req.remote_addr);
+      (void)ensureRequestId(req, res);
 
-      // JV-Linkコンポーネントの初期化状態を確認
-      bool jvlink_initialized = jvlink_wrapper_ && jvlink_wrapper_->isInitialized();
+      JVLinkHealthSnapshot jvlink_health;
+      if (jvlink_wrapper_) {
+        jvlink_health = jvlink_wrapper_->getHealthSnapshot();
+      } else {
+        jvlink_health.status = "unavailable";
+      }
+      bool healthy = jvlink_health.operational;
 
       json health_response = {
-          {"status", "healthy"},
+          {"status", healthy ? "healthy" : "unhealthy"},
           {"timestamp", currentUnixTimestampSec()},
           {"service",
            {{"name", "JVLinkServer"},
@@ -546,7 +869,30 @@ class JVLinkHTTPServer {
           {"components",
            {{"http_server", {{"status", "healthy"}, {"port", port_}}},
             {"jvlink",
-             {{"status", jvlink_initialized ? "healthy" : "unhealthy"}, {"initialized", jvlink_initialized}}}}},
+             {{"status", jvlink_health.status},
+              {"initialized", jvlink_health.initialized},
+              {"operational", jvlink_health.operational},
+              {"faulted", jvlink_health.faulted},
+              {"current_operation", jvlink_health.current_operation.empty() ? json(nullptr)
+                                                                           : json(jvlink_health.current_operation)},
+              {"current_operation_started_at",
+               jvlink_health.current_operation_started_at > 0 ? json(jvlink_health.current_operation_started_at)
+                                                              : json(nullptr)},
+              {"event_watch_active", jvlink_health.event_watch_active},
+              {"last_fault_message",
+               jvlink_health.last_fault_message.empty() ? json(nullptr) : json(jvlink_health.last_fault_message)},
+              {"last_fault_timestamp",
+               jvlink_health.last_fault_timestamp > 0 ? json(jvlink_health.last_fault_timestamp) : json(nullptr)},
+              {"worker",
+               {{"running", jvlink_health.worker.running},
+                {"accepting_tasks", jvlink_health.worker.accepting_tasks},
+                {"faulted", jvlink_health.worker.faulted},
+                {"last_fault_message",
+                 jvlink_health.worker.last_fault_message.empty() ? json(nullptr)
+                                                                 : json(jvlink_health.worker.last_fault_message)},
+                {"last_fault_timestamp",
+                 jvlink_health.worker.last_fault_timestamp > 0 ? json(jvlink_health.worker.last_fault_timestamp)
+                                                               : json(nullptr)}}}}}}},
           {"metrics",
            {{"busy",
              {{"count", busy_rejection_count_.load(std::memory_order_relaxed)},
@@ -554,6 +900,19 @@ class JVLinkHTTPServer {
                last_busy_timestamp_.load(std::memory_order_relaxed) > 0
                    ? json(last_busy_timestamp_.load(std::memory_order_relaxed))
                    : json(nullptr)}}}}}};
+
+      health_response["metrics"]["unavailable"] = {
+          {"count", unavailable_rejection_count_.load(std::memory_order_relaxed)},
+          {"last_timestamp",
+           last_unavailable_timestamp_.load(std::memory_order_relaxed) > 0
+               ? json(last_unavailable_timestamp_.load(std::memory_order_relaxed))
+               : json(nullptr)},
+      };
+      health_response["session"] = buildSessionJson();
+
+      if (!healthy) {
+        res.status = 503;
+      }
 
       res.set_content(health_response.dump(), "application/json; charset=utf-8");
     } catch (const std::exception& e) {
@@ -573,6 +932,7 @@ class JVLinkHTTPServer {
   void handleVersion(const httplib::Request& req, httplib::Response& res) {
     try {
       spdlog::debug("Version info requested from {}", req.remote_addr);
+      (void)ensureRequestId(req, res);
 
       json version_response = {
           {"api_version", jvlink::server::getApiVersion()},
@@ -601,6 +961,7 @@ class JVLinkHTTPServer {
   void handleQuery(const httplib::Request& req, httplib::Response& res) {
     try {
       spdlog::info("Received /query/stored request from {}", req.remote_addr);
+      const std::string request_id = ensureRequestId(req, res);
 
       if (req.body.empty()) {
         res.status = 400;
@@ -680,27 +1041,37 @@ class JVLinkHTTPServer {
             data_spec);
       }
 
-      auto session_lock = std::make_shared<std::unique_lock<std::mutex>>(jvlink_operation_mutex_, std::try_to_lock);
-      if (!session_lock->owns_lock()) {
-        setBusyResponse(req, res, "query_stored");
+      if (!ensureWrapperOperational(req, res, "query_stored", request_id)) {
         return;
       }
+
+      JVLinkWrapper* wrapper = jvlink_wrapper_.get();
+      auto session_lock = std::make_shared<std::unique_lock<std::mutex>>(jvlink_operation_mutex_, std::try_to_lock);
+      if (!session_lock->owns_lock()) {
+        setBusyResponse(req, res, "query_stored", request_id);
+        return;
+      }
+      const auto session_lease = std::make_shared<SessionLease>(
+          this, makeSessionSnapshot(req, "query_stored", request_id, data_spec));
+      const uint64_t reset_generation = session_reset_generation_.load(std::memory_order_relaxed);
 
       // JVLinkWrapperにリトライ設定を適用
       JVLinkWrapper::RetryConfig retry_config;
       retry_config.auto_retry_on_corruption = auto_retry;
       retry_config.max_retry_attempts = max_retries;
       retry_config.retry_delay_ms = retry_delay_ms;
-      jvlink_wrapper_->setRetryConfig(retry_config);
+      wrapper->setRetryConfig(retry_config);
 
       // Keep-Alive を明示
       res.set_header("Connection", "keep-alive");
 
       res.set_chunked_content_provider(
-          "application/x-ndjson; charset=utf-8", [this, data_spec, from_date, option, max_records_req,
-                                               filter_record_types, session_lock](size_t offset,
+          "application/x-ndjson; charset=utf-8", [this, wrapper, data_spec, from_date, option, max_records_req,
+                                               filter_record_types, session_lock, session_lease,
+                                               reset_generation](size_t offset,
                                                                                   httplib::DataSink& sink) {
             (void)session_lock;
+            (void)session_lease;
             if (offset == 0) {
               // 初回呼び出し時にストリーミング処理を開始
 
@@ -828,9 +1199,10 @@ class JVLinkHTTPServer {
               try {
                 spdlog::debug("Using JVGets for better performance");
                 // クエリ実行（max_records と record_types を反映）
-                jvlink_wrapper_->queryStored(data_spec, from_date, option, max_records_req, record_callback,
-                                             meta_callback, filter_record_types,
-                                             [&]() { return client_disconnected.load(); });
+                wrapper->queryStored(data_spec, from_date, option, max_records_req, record_callback, meta_callback,
+                                     filter_record_types, [&]() {
+                                       return client_disconnected.load() || isSessionResetRequested(reset_generation);
+                                     });
                 spdlog::debug(
                     "queryStored returned for data_spec: {} (meta_line_sent={}, streamed_records={}, option={}, "
                     "client_disconnected={})",
@@ -859,6 +1231,11 @@ class JVLinkHTTPServer {
                     e.errorCode());
                 streaming_active.store(false);
                 if (heartbeat_thread.joinable()) heartbeat_thread.join();
+              } catch (const JVLinkFatalException& e) {
+                spdlog::error("Streaming fatal JV-Link error in /query/stored: {}", e.what());
+                writeStreamErrorLine(sink, sink_mutex, std::string("JV-Link became unavailable: ") + e.what(), -50301);
+                streaming_active.store(false);
+                if (heartbeat_thread.joinable()) heartbeat_thread.join();
               } catch (const std::exception& e) {
                 spdlog::error("Streaming error in /query/stored: {}", e.what());
                 writeStreamErrorLine(
@@ -874,6 +1251,8 @@ class JVLinkHTTPServer {
             return true;
           });
 
+    } catch (const JVLinkFatalException& e) {
+      handleWrapperFatalException(req, res, "query_stored", ensureRequestId(req, res), e);
     } catch (const std::exception& e) {
       spdlog::error("An error occurred in handleQuery: {}", e.what());
       res.status = 500;
@@ -890,6 +1269,7 @@ class JVLinkHTTPServer {
    */
   void handleShutdown(const httplib::Request& req, httplib::Response& res) {
     spdlog::info("Shutdown request from {}", req.remote_addr);
+    (void)ensureRequestId(req, res);
 
     json response = {{"status", "ok"}, {"message", "Server is shutting down"}};
     res.set_content(response.dump(), "application/json; charset=utf-8");
@@ -912,10 +1292,12 @@ class JVLinkHTTPServer {
   void handleFileDelete(const httplib::Request& req, httplib::Response& res) {
     try {
       spdlog::info("Received /files/delete request from {}", req.remote_addr);
+      const std::string request_id = ensureRequestId(req, res);
       std::unique_lock<std::mutex> op_lock;
-      if (!tryBeginOperation(op_lock, req, res, "files_delete")) {
+      if (!tryBeginOperation(op_lock, req, res, "files_delete", request_id)) {
         return;
       }
+      SessionLease session_lease(this, makeSessionSnapshot(req, "files_delete", request_id));
 
       if (req.body.empty()) {
         res.status = 400;
@@ -974,6 +1356,8 @@ class JVLinkHTTPServer {
 
       res.set_content(response.dump(), "application/json; charset=utf-8");
 
+    } catch (const JVLinkFatalException& e) {
+      handleWrapperFatalException(req, res, "files_delete", ensureRequestId(req, res), e);
     } catch (const std::exception& e) {
       spdlog::error("Exception in handleFileDelete: {}", e.what());
       res.status = 500;
@@ -990,10 +1374,12 @@ class JVLinkHTTPServer {
   void handleUniformFile(const httplib::Request& req, httplib::Response& res) {
     try {
       spdlog::info("Received /uniform/file request from {}", req.remote_addr);
+      const std::string request_id = ensureRequestId(req, res);
       std::unique_lock<std::mutex> op_lock;
-      if (!tryBeginOperation(op_lock, req, res, "uniform_file")) {
+      if (!tryBeginOperation(op_lock, req, res, "uniform_file", request_id)) {
         return;
       }
+      SessionLease session_lease(this, makeSessionSnapshot(req, "uniform_file", request_id));
 
       if (req.body.empty()) {
         res.status = 400;
@@ -1068,6 +1454,8 @@ class JVLinkHTTPServer {
 
       res.set_content(response.dump(), "application/json; charset=utf-8");
 
+    } catch (const JVLinkFatalException& e) {
+      handleWrapperFatalException(req, res, "uniform_file", ensureRequestId(req, res), e);
     } catch (const std::exception& e) {
       spdlog::error("Exception in handleUniformFile: {}", e.what());
       res.status = 500;
@@ -1084,10 +1472,12 @@ class JVLinkHTTPServer {
   void handleUniformImage(const httplib::Request& req, httplib::Response& res) {
     try {
       spdlog::info("Received /uniform/image request from {}", req.remote_addr);
+      const std::string request_id = ensureRequestId(req, res);
       std::unique_lock<std::mutex> op_lock;
-      if (!tryBeginOperation(op_lock, req, res, "uniform_image")) {
+      if (!tryBeginOperation(op_lock, req, res, "uniform_image", request_id)) {
         return;
       }
+      SessionLease session_lease(this, makeSessionSnapshot(req, "uniform_image", request_id));
 
       if (req.body.empty()) {
         res.status = 400;
@@ -1164,6 +1554,8 @@ class JVLinkHTTPServer {
         res.set_content(error_response.dump(), "application/json; charset=utf-8");
       }
 
+    } catch (const JVLinkFatalException& e) {
+      handleWrapperFatalException(req, res, "uniform_image", ensureRequestId(req, res), e);
     } catch (const std::exception& e) {
       spdlog::error("Exception in handleUniformImage: {}", e.what());
       res.status = 500;
@@ -1180,10 +1572,12 @@ class JVLinkHTTPServer {
   void handleCourseFile(const httplib::Request& req, httplib::Response& res) {
     try {
       spdlog::info("Received /course/file request from {}", req.remote_addr);
+      const std::string request_id = ensureRequestId(req, res);
       std::unique_lock<std::mutex> op_lock;
-      if (!tryBeginOperation(op_lock, req, res, "course_file")) {
+      if (!tryBeginOperation(op_lock, req, res, "course_file", request_id)) {
         return;
       }
+      SessionLease session_lease(this, makeSessionSnapshot(req, "course_file", request_id));
 
       if (req.body.empty()) {
         res.status = 400;
@@ -1260,6 +1654,8 @@ class JVLinkHTTPServer {
 
       res.set_content(response.dump(), "application/json; charset=utf-8");
 
+    } catch (const JVLinkFatalException& e) {
+      handleWrapperFatalException(req, res, "course_file", ensureRequestId(req, res), e);
     } catch (const std::exception& e) {
       spdlog::error("Exception in handleCourseFile: {}", e.what());
       res.status = 500;
@@ -1276,10 +1672,12 @@ class JVLinkHTTPServer {
   void handleCourseFile2(const httplib::Request& req, httplib::Response& res) {
     try {
       spdlog::info("Received /course/file2 request from {}", req.remote_addr);
+      const std::string request_id = ensureRequestId(req, res);
       std::unique_lock<std::mutex> op_lock;
-      if (!tryBeginOperation(op_lock, req, res, "course_file2")) {
+      if (!tryBeginOperation(op_lock, req, res, "course_file2", request_id)) {
         return;
       }
+      SessionLease session_lease(this, makeSessionSnapshot(req, "course_file2", request_id));
 
       if (req.body.empty()) {
         res.status = 400;
@@ -1356,6 +1754,8 @@ class JVLinkHTTPServer {
 
       res.set_content(response.dump(), "application/json; charset=utf-8");
 
+    } catch (const JVLinkFatalException& e) {
+      handleWrapperFatalException(req, res, "course_file2", ensureRequestId(req, res), e);
     } catch (const std::exception& e) {
       spdlog::error("Exception in handleCourseFile2: {}", e.what());
       res.status = 500;
@@ -1372,10 +1772,12 @@ class JVLinkHTTPServer {
   void handleCourseImage(const httplib::Request& req, httplib::Response& res) {
     try {
       spdlog::info("Received /course/image request from {}", req.remote_addr);
+      const std::string request_id = ensureRequestId(req, res);
       std::unique_lock<std::mutex> op_lock;
-      if (!tryBeginOperation(op_lock, req, res, "course_image")) {
+      if (!tryBeginOperation(op_lock, req, res, "course_image", request_id)) {
         return;
       }
+      SessionLease session_lease(this, makeSessionSnapshot(req, "course_image", request_id));
 
       if (req.body.empty()) {
         res.status = 400;
@@ -1460,6 +1862,8 @@ class JVLinkHTTPServer {
         res.set_content(error_response.dump(), "application/json; charset=utf-8");
       }
 
+    } catch (const JVLinkFatalException& e) {
+      handleWrapperFatalException(req, res, "course_image", ensureRequestId(req, res), e);
     } catch (const std::exception& e) {
       spdlog::error("Exception in handleCourseImage: {}", e.what());
       res.status = 500;
@@ -1476,6 +1880,7 @@ class JVLinkHTTPServer {
    */
   void handleRealtimeOpen(const httplib::Request& req, httplib::Response& res) {
     try {
+      const std::string request_id = ensureRequestId(req, res);
       if (req.body.empty()) {
         res.status = 400;
         json error_response = {{"error", {{"message", "Request body is empty"}}}};
@@ -1524,19 +1929,29 @@ class JVLinkHTTPServer {
 
       spdlog::info("Realtime open stream request received. dataspec: {}, key: {}", data_spec, key);
 
-      auto session_lock = std::make_shared<std::unique_lock<std::mutex>>(jvlink_operation_mutex_, std::try_to_lock);
-      if (!session_lock->owns_lock()) {
-        setBusyResponse(req, res, "query_realtime");
+      if (!ensureWrapperOperational(req, res, "query_realtime", request_id)) {
         return;
       }
+
+      JVLinkWrapper* wrapper = jvlink_wrapper_.get();
+      auto session_lock = std::make_shared<std::unique_lock<std::mutex>>(jvlink_operation_mutex_, std::try_to_lock);
+      if (!session_lock->owns_lock()) {
+        setBusyResponse(req, res, "query_realtime", request_id);
+        return;
+      }
+      const auto session_lease = std::make_shared<SessionLease>(
+          this, makeSessionSnapshot(req, "query_realtime", request_id, data_spec, key));
+      const uint64_t reset_generation = session_reset_generation_.load(std::memory_order_relaxed);
 
       // Keep-Alive を明示
       res.set_header("Connection", "keep-alive");
 
       res.set_chunked_content_provider(
           "application/x-ndjson; charset=utf-8",
-          [this, data_spec, key, session_lock](size_t offset, httplib::DataSink& sink) {
+          [this, wrapper, data_spec, key, session_lock, session_lease, reset_generation](size_t offset,
+                                                                                          httplib::DataSink& sink) {
             (void)session_lock;
+            (void)session_lease;
             if (offset == 0) {
               // カスタム例外クラス（クライアント切断用）
               class ClientDisconnectedException : public std::exception {
@@ -1613,7 +2028,9 @@ class JVLinkHTTPServer {
               }
 
               try {
-                jvlink_wrapper_->queryRealtime(data_spec, key, record_callback, meta_callback);
+                wrapper->queryRealtime(data_spec, key, record_callback, meta_callback, [&]() {
+                  return isSessionResetRequested(reset_generation);
+                });
                 streaming_active.store(false);
                 if (heartbeat_thread.joinable()) heartbeat_thread.join();
               } catch (const ClientDisconnectedException&) {
@@ -1624,11 +2041,20 @@ class JVLinkHTTPServer {
                     data_spec);
                 streaming_active.store(false);
                 if (heartbeat_thread.joinable()) heartbeat_thread.join();
+              } catch (const JVOperationCanceledException& e) {
+                spdlog::info("Realtime streaming canceled for dataspec: {}: {}", data_spec, e.what());
+                streaming_active.store(false);
+                if (heartbeat_thread.joinable()) heartbeat_thread.join();
               } catch (const JVStreamReadException& e) {
                 spdlog::error("Streaming JV read error in /query/realtime: {} (code: {})", e.what(), e.errorCode());
                 writeStreamErrorLine(
                     sink, sink_mutex, std::string("Streaming JV read error in /query/realtime: ") + e.what(),
                     e.errorCode());
+                streaming_active.store(false);
+                if (heartbeat_thread.joinable()) heartbeat_thread.join();
+              } catch (const JVLinkFatalException& e) {
+                spdlog::error("Streaming fatal JV-Link error in /query/realtime: {}", e.what());
+                writeStreamErrorLine(sink, sink_mutex, std::string("JV-Link became unavailable: ") + e.what(), -50301);
                 streaming_active.store(false);
                 if (heartbeat_thread.joinable()) heartbeat_thread.join();
               } catch (const std::exception& e) {
@@ -1648,6 +2074,8 @@ class JVLinkHTTPServer {
       res.status = 400;
       json error_response = {{"error", {{"message", "Invalid JSON format"}}}};
       res.set_content(error_response.dump(), "application/json; charset=utf-8");
+    } catch (const JVLinkFatalException& e) {
+      handleWrapperFatalException(req, res, "query_realtime", ensureRequestId(req, res), e);
     } catch (const std::exception& e) {
       spdlog::error("Exception in handleRealtimeOpen: {}", e.what());
       res.status = 500;
@@ -1745,39 +2173,61 @@ class JVLinkHTTPServer {
   }
 
   void handleEventStart(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("Handling /event/start request...");
-    std::unique_lock<std::mutex> op_lock;
-    if (!tryBeginOperation(op_lock, req, res, "event_start")) {
-      return;
-    }
-    json response;
+    try {
+      spdlog::info("Handling /event/start request...");
+      const std::string request_id = ensureRequestId(req, res);
+      std::unique_lock<std::mutex> op_lock;
+      if (!tryBeginOperation(op_lock, req, res, "event_start", request_id)) {
+        return;
+      }
+      SessionLease session_lease(this, makeSessionSnapshot(req, "event_start", request_id));
+      json response;
 
-    if (jvlink_wrapper_->startEventWatch()) {
-      response = {{"status", "success"}, {"message", "Event watch started successfully."}};
-      res.status = 200;
-    } else {
-      response = {{"status", "error"}, {"error_message", "Failed to start event watch."}};
+      if (jvlink_wrapper_->startEventWatch()) {
+        response = {{"status", "success"}, {"message", "Event watch started successfully."}};
+        res.status = 200;
+      } else {
+        response = {{"status", "error"}, {"error_message", "Failed to start event watch."}};
+        res.status = 500;
+      }
+      res.set_content(response.dump(), "application/json");
+    } catch (const JVLinkFatalException& e) {
+      handleWrapperFatalException(req, res, "event_start", ensureRequestId(req, res), e);
+    } catch (const std::exception& e) {
+      spdlog::error("Exception in handleEventStart: {}", e.what());
       res.status = 500;
+      json error_response = {{"error", {{"message", "Internal Server Error"}}}};
+      res.set_content(error_response.dump(), "application/json; charset=utf-8");
     }
-    res.set_content(response.dump(), "application/json");
   }
 
   void handleEventStop(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("Handling /event/stop request...");
-    std::unique_lock<std::mutex> op_lock;
-    if (!tryBeginOperation(op_lock, req, res, "event_stop")) {
-      return;
-    }
-    json response;
+    try {
+      spdlog::info("Handling /event/stop request...");
+      const std::string request_id = ensureRequestId(req, res);
+      std::unique_lock<std::mutex> op_lock;
+      if (!tryBeginOperation(op_lock, req, res, "event_stop", request_id)) {
+        return;
+      }
+      SessionLease session_lease(this, makeSessionSnapshot(req, "event_stop", request_id));
+      json response;
 
-    if (jvlink_wrapper_->stopEventWatch()) {
-      response = {{"status", "success"}, {"message", "Event watch stopped successfully."}};
-      res.status = 200;
-    } else {
-      response = {{"status", "error"}, {"error_message", "Failed to stop event watch."}};
+      if (jvlink_wrapper_->stopEventWatch()) {
+        response = {{"status", "success"}, {"message", "Event watch stopped successfully."}};
+        res.status = 200;
+      } else {
+        response = {{"status", "error"}, {"error_message", "Failed to stop event watch."}};
+        res.status = 500;
+      }
+      res.set_content(response.dump(), "application/json");
+    } catch (const JVLinkFatalException& e) {
+      handleWrapperFatalException(req, res, "event_stop", ensureRequestId(req, res), e);
+    } catch (const std::exception& e) {
+      spdlog::error("Exception in handleEventStop: {}", e.what());
       res.status = 500;
+      json error_response = {{"error", {{"message", "Internal Server Error"}}}};
+      res.set_content(error_response.dump(), "application/json; charset=utf-8");
     }
-    res.set_content(response.dump(), "application/json");
   }
 
   /**
@@ -1860,6 +2310,7 @@ struct ServerConfig {
   int port = 8765;                 // HTTPサーバーのポート番号（Pythonクライアントのデフォルト）
   std::string sid = "UNKNOWN";     // JVInit時のSID
   std::string log_level = "info";  // ログ出力レベル
+  std::string mode = "supervisor";
   bool help = false;
   bool version = false;
 };
@@ -1893,6 +2344,11 @@ ServerConfig parseArguments(int argc, char* argv[]) {
     config.sid = env_sid;
   }
 
+  const char* env_mode = std::getenv("JVLINK_SERVER_MODE");
+  if (env_mode != nullptr && std::strlen(env_mode) > 0) {
+    config.mode = env_mode;
+  }
+
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
 
@@ -1912,6 +2368,10 @@ ServerConfig parseArguments(int argc, char* argv[]) {
       if (i + 1 < argc) {
         config.sid = argv[++i];
       }
+    } else if (arg == "--mode") {
+      if (i + 1 < argc) {
+        config.mode = argv[++i];
+      }
     }
   }
 
@@ -1928,6 +2388,7 @@ ServerConfig parseArguments(int argc, char* argv[]) {
 void printUsage(const char* program_name) {
   std::cout << "Usage: " << program_name << " [options]\n"
             << "Options:\n"
+            << "      --mode <mode>         Server mode: supervisor or worker (default: supervisor)\n"
             << "  -p, --port <port>         Server port (default: 8765)\n"
             << "  -l, --log-level <level>   Log level: debug, info, warn, error (default: info)\n"
             << "      --sid <sid>           Software ID for JVInit (default: UNKNOWN)\n"
@@ -1977,11 +2438,18 @@ int main(int argc, char* argv[]) {
 
   // ログシステムを初期化
   initializeLogging(config.log_level);
+  const bool worker_mode = config.mode == "worker";
+  if (!worker_mode && config.mode != "supervisor") {
+    spdlog::error("Invalid --mode value: {}. Expected 'supervisor' or 'worker'.", config.mode);
+    spdlog::shutdown();
+    return 1;
+  }
 
-  std::unique_ptr<JVLinkHTTPServer> server;
+  std::unique_ptr<JVLinkHTTPServer> worker_server;
+  std::unique_ptr<SupervisorHTTPServer> supervisor_server;
 
-  // シグナルハンドラーからアクセスできるようグローバルポインタを保持
-  static std::unique_ptr<JVLinkHTTPServer>* global_server_ptr = nullptr;
+  static std::function<void()>* global_stop_callback = nullptr;
+  std::function<void()> stop_callback;
 
   try {
     // SIGINT (Ctrl+C) シグナルハンドラーを設定
@@ -1989,8 +2457,8 @@ int main(int argc, char* argv[]) {
       spdlog::warn("SIGINT received, shutting down gracefully...");
 
       // サーバーインスタンスが存在すれば停止
-      if (global_server_ptr && *global_server_ptr) {
-        (*global_server_ptr)->stop();
+      if (global_stop_callback && *global_stop_callback) {
+        (*global_stop_callback)();
       }
 
       // 終了前にログをフラッシュ
@@ -2000,11 +2468,37 @@ int main(int argc, char* argv[]) {
       exit(0);
     });
 
-    // JVLinkHTTPサーバーインスタンスを作成
-    server = std::make_unique<JVLinkHTTPServer>(config.port, config.sid);
-    global_server_ptr = &server;  // シグナルハンドラー用に参照を保存
+    if (worker_mode) {
+      worker_server = std::make_unique<JVLinkHTTPServer>(config.port, config.sid);
+      stop_callback = [&]() {
+        if (worker_server) {
+          worker_server->stop();
+        }
+      };
+      global_stop_callback = &stop_callback;
 
-    if (!server->start(true)) {
+      if (!worker_server->start(true)) {
+        spdlog::error("Failed to start worker server on port {}", config.port);
+        spdlog::shutdown();
+        return 1;
+      }
+    } else {
+      supervisor_server = std::make_unique<SupervisorHTTPServer>(config.port, config.sid, config.log_level);
+      stop_callback = [&]() {
+        if (supervisor_server) {
+          supervisor_server->stop();
+        }
+      };
+      global_stop_callback = &stop_callback;
+
+      if (!supervisor_server->start(true)) {
+        spdlog::error("Failed to start supervisor server on port {}", config.port);
+        spdlog::shutdown();
+        return 1;
+      }
+    }
+
+    if ((worker_mode && !worker_server) || (!worker_mode && !supervisor_server)) {
       spdlog::error("Failed to start server on port {}", config.port);
       // エラー時のログフラッシュ
       spdlog::shutdown();
